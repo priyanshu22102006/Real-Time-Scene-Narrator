@@ -17,7 +17,8 @@ class BaseConfig:
 
     # API Keys
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCJYEAaMaqQrV_BCR6ltw5CecH2yrNymUA")
-    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    FALLBACK_GEMINI_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-flash-8b"]
 
 
     ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
@@ -92,6 +93,7 @@ def get_config():
 config = get_config()
 GEMINI_API_KEY = config.GEMINI_API_KEY
 GEMINI_MODEL = config.GEMINI_MODEL
+FALLBACK_GEMINI_MODELS = config.FALLBACK_GEMINI_MODELS
 ELEVENLABS_API_KEY = config.ELEVENLABS_API_KEY
 ELEVENLABS_VOICE_ID = config.ELEVENLABS_VOICE_ID
 ELEVENLABS_MODEL_ID = config.ELEVENLABS_MODEL_ID

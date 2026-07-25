@@ -548,3 +548,62 @@ footer {
   .btn-action { font-size: 1.15rem; min-height: 58px; }
   .announcement-text { font-size: 1.1rem; }
 }
+
+/* Live Camera HUD and Risk Alert Banner Overlay */
+.risk-alert-banner {
+  position: absolute;
+  top: 60px;
+  left: 16px;
+  right: 16px;
+  background: rgba(255, 69, 58, 0.95);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(255, 69, 58, 0.6);
+  z-index: 20;
+  animation: flash-risk 1.2s infinite ease-in-out;
+}
+
+.risk-alert-banner.hidden {
+  display: none;
+}
+
+@keyframes flash-risk {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.01); }
+}
+
+.live-nav-hud {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  background: rgba(9, 10, 15, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--accent-yellow);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  z-index: 15;
+}
+
+.live-nav-hud.hidden {
+  display: none;
+}
+
+.hud-step-text {
+  color: var(--accent-yellow);
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+}
+
+.hud-surrounding-text {
+  color: var(--text-main);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}

@@ -34,6 +34,16 @@
       <video id="camera" class="camera-viewport" autoplay playsinline muted></video>
       <canvas id="captureCanvas" hidden></canvas>
       
+      <!-- Live Risk Alert Overlay & Live Navigation HUD -->
+      <div id="riskAlertBanner" class="risk-alert-banner hidden">
+        <span class="risk-icon">🛑</span>
+        <span id="riskAlertText" class="risk-alert-text">No active risk alerts</span>
+      </div>
+      <div id="liveNavHud" class="live-nav-hud hidden">
+        <div id="hudStepText" class="hud-step-text">GPS Mode Active: Head towards destination</div>
+        <div id="hudSurroundingText" class="hud-surrounding-text">Live video surroundings & hazard monitor scanning...</div>
+      </div>
+
       <div class="camera-overlay">
         <div class="status-tag">
           <span id="statusDot" class="status-dot"></span>
@@ -107,10 +117,10 @@
       </section>
 
 
-      <!-- Feature 1: Walking Navigation -->
-      <section class="feature-card" aria-label="Walking Directions">
+      <!-- Feature 1: Walking Navigation & Live Surroundings Viewport -->
+      <section class="feature-card" aria-label="Walking Directions with Live Surroundings & Risk Alerts">
         <div class="feature-header">
-          <h2 class="feature-title">Walking Directions</h2>
+          <h2 class="feature-title">GPS Navigation & Live Video Surroundings</h2>
           <span class="shortcut-badge">Alt + N</span>
         </div>
         <div class="nav-input-group">
@@ -119,11 +129,16 @@
           <label for="destinationInput">Destination Address</label>
           <input type="text" id="destinationInput" class="text-input" placeholder="e.g. Empire State Building, New York" aria-label="Destination Address" />
         </div>
-        <button id="btnNavigate" class="btn-action" style="margin-bottom: 12px;">
-          <span>🚶 Get Directions</span>
-        </button>
+        <div class="step-btn-group" style="margin-bottom: 12px;">
+          <button id="btnNavigate" class="btn-action" style="flex: 1;">
+            <span>🚶 Start Navigation</span>
+          </button>
+          <button id="btnToggleNavLiveVideo" class="btn-secondary" style="flex: 1; padding: 16px; font-size: 1rem; background: var(--accent-yellow); color: var(--text-dark);">
+            <span>📹 Toggle Live Video & Risk Alerts</span>
+          </button>
+        </div>
 
-        <!-- Active Turn Step Recitation Controls -->
+        <!-- Active Turn Step Recitation Controls & Surroundings View -->
         <div id="stepControlsContainer" class="step-controls hidden">
           <div class="step-status-bar">
             <span id="stepCounterText">Step 1 of 1</span>
@@ -133,13 +148,18 @@
             No route calculated yet. Enter a destination above.
           </div>
           <div class="step-btn-group">
-            <button id="btnPrevStep" class="btn-secondary">⬅️ Prev</button>
+            <button id="btnPrevStep" class="btn-secondary">⬅️ Prev Step</button>
             <button id="btnReadStep" class="btn-secondary" style="background: var(--accent-yellow); color: var(--text-dark);">🔊 Read Step</button>
-            <button id="btnNextStep" class="btn-secondary">Next ➡️</button>
+            <button id="btnNextStep" class="btn-secondary">Next Step ➡️</button>
           </div>
-          <button id="btnOpenLiveMaps" class="btn-secondary" style="width: 100%; margin-top: 10px;">
-            🗺️ Open Live Google Maps
-          </button>
+          <div class="step-btn-group" style="margin-top: 10px;">
+            <button id="btnAnalyzeSurroundings" class="btn-secondary" style="background: #2563eb; color: white;">
+              🔍 Scan Surroundings Now
+            </button>
+            <button id="btnOpenLiveMaps" class="btn-secondary">
+              🗺️ Open Live Google Maps
+            </button>
+          </div>
         </div>
       </section>
 
@@ -171,8 +191,6 @@
         <div class="nav-input-group">
           <label for="docFileInput">Upload Document / Image (JPG, PNG, PDF, DOCX)</label>
           <input type="file" id="docFileInput" class="text-input" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx" aria-label="Upload Document" />
-          <label for="googleMapsKeyInput">Google Maps API Key (Optional)</label>
-          <input type="password" id="googleMapsKeyInput" class="text-input" placeholder="Optional Google Maps Key" aria-label="Google Maps Key" />
         </div>
         <button id="btnProcessDoc" class="btn-action">
           <span>📖 Read Address & Start Navigation</span>
@@ -439,9 +457,11 @@ function toggleHazardDetection() {
 
 btnHazardToggle.addEventListener('click', toggleHazardDetection);
 
-// --- Feature 1: Navigation with Interactive Step Controls ----------------------
+// --- Feature 1: Navigation with Interactive Step Controls & Live Video Risk Scanner ---
 let currentNavRoute = null;
 let currentStepIndex = 0;
+let liveNavActive = false;
+let liveNavInterval = null;
 
 const stepControlsContainer = document.getElementById('stepControlsContainer');
 const stepCounterText = document.getElementById('stepCounterText');
@@ -451,10 +471,19 @@ const btnPrevStep = document.getElementById('btnPrevStep');
 const btnNextStep = document.getElementById('btnNextStep');
 const btnReadStep = document.getElementById('btnReadStep');
 const btnOpenLiveMaps = document.getElementById('btnOpenLiveMaps');
+const btnToggleNavLiveVideo = document.getElementById('btnToggleNavLiveVideo');
+const btnAnalyzeSurroundings = document.getElementById('btnAnalyzeSurroundings');
+
+const riskAlertBanner = document.getElementById('riskAlertBanner');
+const riskAlertText = document.getElementById('riskAlertText');
+const liveNavHud = document.getElementById('liveNavHud');
+const hudStepText = document.getElementById('hudStepText');
+const hudSurroundingText = document.getElementById('hudSurroundingText');
 
 function updateStepUI() {
   if (!currentNavRoute || !currentNavRoute.voice_commands || currentNavRoute.voice_commands.length === 0) {
     stepControlsContainer.classList.add('hidden');
+    liveNavHud.classList.add('hidden');
     return;
   }
 
@@ -465,12 +494,94 @@ function updateStepUI() {
   if (currentStepIndex < 0) currentStepIndex = 0;
   if (currentStepIndex >= total) currentStepIndex = total - 1;
 
+  const currentCmd = commands[currentStepIndex];
   stepCounterText.textContent = `Step ${currentStepIndex + 1} of ${total}`;
   stepDistanceBadge.textContent = currentNavRoute.total_distance || '';
-  activeStepInstruction.textContent = commands[currentStepIndex];
+  activeStepInstruction.textContent = currentCmd;
+
+  if (hudStepText) {
+    hudStepText.textContent = `Step ${currentStepIndex + 1}: ${currentCmd}`;
+  }
 
   btnPrevStep.disabled = (currentStepIndex === 0);
   btnNextStep.disabled = (currentStepIndex === total - 1);
+}
+
+async function checkLiveNavTick(forceAnalysis = false) {
+  if (!liveNavActive && !forceAnalysis) return;
+
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('frame', blob, 'nav_frame.jpg');
+    form.append('step_index', currentStepIndex.toString());
+    if (forceAnalysis) {
+      form.append('analyze_surroundings', 'true');
+    }
+
+    const resp = await fetch('/api/live_navigation_tick', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+
+    if (result.success) {
+      // 1. Update Risk Alert Banner
+      if (result.alerts && result.alerts.length > 0) {
+        const msg = result.alerts.map(a => a.message).join(' ');
+        riskAlertText.textContent = msg;
+        riskAlertBanner.classList.remove('hidden');
+      } else {
+        riskAlertBanner.classList.add('hidden');
+      }
+
+      // 2. Update HUD text
+      if (result.surrounding_analysis) {
+        hudSurroundingText.textContent = result.surrounding_analysis;
+      }
+
+      // 3. Audio narration for risk warnings or visual updates
+      if (result.spoken_alert) {
+        speakText(result.spoken_alert, result.audio_url);
+      }
+    }
+  } catch (err) {
+    console.warn('Live navigation tick error:', err);
+  }
+}
+
+function toggleLiveNavVideo() {
+  liveNavActive = !liveNavActive;
+  if (liveNavActive) {
+    btnToggleNavLiveVideo.innerHTML = '<span>🛑 Stop Live Video Scanner</span>';
+    btnToggleNavLiveVideo.style.background = 'var(--danger)';
+    btnToggleNavLiveVideo.style.color = '#ffffff';
+    liveNavHud.classList.remove('hidden');
+    statusDot.className = 'status-dot active';
+    camStatusText.textContent = 'Live Voice Nav & Hazard Scanner Active';
+    speakText('Live camera video hazard scanner activated for GPS navigation.');
+    liveNavInterval = setInterval(() => checkLiveNavTick(false), 800);
+  } else {
+    clearInterval(liveNavInterval);
+    btnToggleNavLiveVideo.innerHTML = '<span>📹 Toggle Live Video & Risk Alerts</span>';
+    btnToggleNavLiveVideo.style.background = 'var(--accent-yellow)';
+    btnToggleNavLiveVideo.style.color = 'var(--text-dark)';
+    liveNavHud.classList.add('hidden');
+    riskAlertBanner.classList.add('hidden');
+    statusDot.className = 'status-dot';
+    camStatusText.textContent = 'Camera Ready';
+    speakText('Live camera video hazard scanner stopped.');
+  }
+}
+
+btnToggleNavLiveVideo.addEventListener('click', toggleLiveNavVideo);
+
+if (btnAnalyzeSurroundings) {
+  btnAnalyzeSurroundings.addEventListener('click', () => {
+    speakText('Scanning live camera view of your surroundings...');
+    checkLiveNavTick(true);
+  });
 }
 
 btnPrevStep.addEventListener('click', () => {
@@ -478,6 +589,7 @@ btnPrevStep.addEventListener('click', () => {
     currentStepIndex--;
     updateStepUI();
     speakText(currentNavRoute.voice_commands[currentStepIndex]);
+    checkLiveNavTick(false);
   }
 });
 
@@ -486,6 +598,7 @@ btnNextStep.addEventListener('click', () => {
     currentStepIndex++;
     updateStepUI();
     speakText(currentNavRoute.voice_commands[currentStepIndex]);
+    checkLiveNavTick(false);
   }
 });
 
@@ -532,7 +645,12 @@ document.getElementById('btnNavigate').addEventListener('click', () => {
       currentStepIndex = 0;
       updateStepUI();
 
-      // Automatically redirect to Google Maps live navigation in a new tab
+      // Automatically enable live video hazard scanner upon starting navigation
+      if (!liveNavActive) {
+        toggleLiveNavVideo();
+      }
+
+      // Open Google Maps link if available
       if (result.maps_url) {
         window.open(result.maps_url, '_blank');
       }
@@ -602,13 +720,11 @@ document.getElementById('btnProcessDoc').addEventListener('click', async () => {
     return;
   }
   const file = fileInput.files[0];
-  const mapsKey = document.getElementById('googleMapsKeyInput').value.trim();
 
   speakText('Extracting address from document and resolving GPS coordinates...');
   try {
     const form = new FormData();
     form.append('file', file);
-    form.append('google_maps_key', mapsKey);
 
     const resp = await fetch('/api/process_document', {
       method: 'POST',

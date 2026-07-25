@@ -143,17 +143,35 @@ class ObjectDetector:
         img_bytes = img_byte_arr.getvalue()
         image_part = types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
 
-        try:
-            response = self.client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=[prompt, image_part],
-            )
-            if not response or not response.text:
-                return "Unable to perform deep hazard scan from camera snapshot."
-            return response.text.strip()
-        except Exception as e:
-            logger.error("Gemini AI hazard analysis error: %s", e)
-            return f"AI Hazard Analysis Error: {e}"
+        from config import FALLBACK_GEMINI_MODELS
+
+        models_to_try = [GEMINI_MODEL] + [m for m in FALLBACK_GEMINI_MODELS if m != GEMINI_MODEL]
+        last_error = None
+
+        for model_name in models_to_try:
+            try:
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt, image_part],
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                err_msg = str(e)
+                if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota" in err_msg:
+                    logger.warning("Gemini hazard scan model %s hit rate limit (429). Retrying fallback model...", model_name)
+                    last_error = e
+                    continue
+                else:
+                    logger.error("Gemini AI hazard analysis error: %s", e)
+                    return f"AI Hazard Analysis Error: {e}"
+
+        if last_error:
+            err_str = str(last_error)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+                return "Gemini AI rate limit reached. Please wait 30 seconds before requesting another AI hazard scan."
+
+        return "Unable to perform deep hazard scan from camera snapshot."
 
     def speak(self, text: str) -> Optional[str]:
         """Convert text alert to spoken MP3 audio."""

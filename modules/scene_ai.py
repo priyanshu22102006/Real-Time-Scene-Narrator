@@ -46,6 +46,42 @@ def _image_part(image_bytes: bytes) -> types.Part:
     return types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
 
 
+FALLBACK_MODELS = [GEMINI_MODEL, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
+
+
+def generate_content_with_fallback(client: genai.Client, contents: Any, preferred_model: Optional[str] = None, config: Any = None) -> Any:
+    """Tries primary model, then falls back through alternative Gemini models on 429 QuotaExceeded."""
+    models_to_try = []
+    if preferred_model:
+        models_to_try.append(preferred_model)
+    for m in FALLBACK_MODELS:
+        if m not in models_to_try:
+            models_to_try.append(m)
+
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config,
+            )
+            if response and response.text:
+                return response
+        except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota" in err_msg:
+                logger.warning("Gemini model %s hit rate/quota limit (429). Retrying fallback model...", model_name)
+                last_error = e
+                continue
+            else:
+                raise e
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("All Gemini model candidates failed to respond.")
+
+
 def describe_scene(image_bytes: bytes, api_key: Optional[str] = None) -> str:
     """
     Feature 4: Given raw JPEG bytes, return a concise, spoken-style
@@ -67,16 +103,16 @@ def describe_scene(image_bytes: bytes, api_key: Optional[str] = None) -> str:
     )
 
     try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[prompt, _image_part(image_bytes)],
-        )
+        response = generate_content_with_fallback(client, contents=[prompt, _image_part(image_bytes)])
         if not response or not response.text:
             return "Unable to generate scene description from image."
         return response.text.strip()
     except Exception as e:
         logger.error("Gemini describe_scene failed: %s", e)
-        raise RuntimeError(f"Scene description AI service error: {e}") from e
+        err_str = str(e)
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+            return "Gemini API request limit reached. Please wait 30 seconds before trying again."
+        return f"Unable to analyze scene right now: {e}"
 
 
 def extract_address_and_landmarks(image_bytes: bytes, api_key: Optional[str] = None) -> Dict[str, Any]:
@@ -103,16 +139,29 @@ def extract_address_and_landmarks(image_bytes: bytes, api_key: Optional[str] = N
     )
 
     try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
+        response = generate_content_with_fallback(
+            client,
             contents=[prompt, _image_part(image_bytes)],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
     except Exception as e:
         logger.error("Gemini extract_address_and_landmarks failed: %s", e)
-        raise RuntimeError(f"Address extraction AI service error: {e}") from e
+        err_str = str(e)
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+            return {
+                "raw_text": "",
+                "possible_address": None,
+                "landmarks": [],
+                "confidence": "low",
+                "notice": "Gemini API rate limit reached. Please wait a few seconds before retrying."
+            }
+        return {
+            "raw_text": "",
+            "possible_address": None,
+            "landmarks": [],
+            "confidence": "low",
+            "notice": f"AI service error: {e}"
+        }
 
     text = response.text.strip() if response and response.text else "{}"
     try:

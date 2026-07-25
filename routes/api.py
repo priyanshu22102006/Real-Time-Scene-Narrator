@@ -230,6 +230,50 @@ def api_navigate():
         return jsonify({"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
 
 
+# ---------------------------------------------------------------- Integrated Live Navigation Tick (Video + Object Detection + Risk Alerts)
+@api_bp.route("/live_navigation_tick", methods=["POST"])
+def api_live_navigation_tick():
+    """
+    Live navigation camera tick endpoint:
+    Processes live video frames during active GPS voice navigation to detect approaching hazards/objects
+    and perform surrounding visual analysis.
+    """
+    session_id = request.headers.get("X-Client-ID", request.form.get("session_id", "default_session"))
+    detector_mgr = current_app.config["DETECTOR_MANAGER"]
+
+    step_idx_str = request.form.get("step_index", request.args.get("step_index"))
+    step_index = int(step_idx_str) if step_idx_str is not None and step_idx_str.isdigit() else None
+    perform_analysis = request.form.get("analyze_surroundings", "false").lower() == "true"
+
+    frame_bytes = None
+    if "frame" in request.files:
+        frame_bytes = request.files["frame"].read()
+    elif "image" in request.files:
+        frame_bytes = request.files["image"].read()
+
+    try:
+        from guidance_system import VoiceGuidedNavigationSystem
+        nav_system = VoiceGuidedNavigationSystem(detector_manager=detector_mgr)
+
+        result = nav_system.process_live_navigation_tick(
+            session_id=session_id,
+            frame_bytes=frame_bytes or b"",
+            step_index=step_index,
+            perform_surrounding_analysis=perform_analysis
+        )
+
+        audio_url = None
+        if result.get("spoken_alert"):
+            audio_url = _speak_helper(result["spoken_alert"])
+
+        result["audio_url"] = audio_url
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.exception("Error in /api/live_navigation_tick: %s", e)
+        return jsonify({"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+
+
 # ---------------------------------------------------------------- Feature 5 (Fused Sighted Guide)
 @api_bp.route("/fused_guidance", methods=["POST"])
 def api_fused_guidance():
@@ -357,6 +401,48 @@ def api_ask_assistant():
         return jsonify({"success": False, "error": {"code": "INVALID_INPUT", "message": str(ve)}}), 400
     except Exception as e:
         logger.exception("Error in /api/ask_assistant: %s", e)
+        return jsonify({"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
+
+
+# ---------------------------------------------------------------- Feature 8 (Handwritten Text & Written Address Extraction)
+@api_bp.route("/extract_handwritten_address", methods=["POST"])
+def api_extract_handwritten_address():
+    """
+    Given an uploaded image of handwritten text (sheet of paper, sticky note, envelope),
+    extract written text, structure geographical address fields, and synthesize audio narration.
+    """
+    if "image" not in request.files:
+        return jsonify({
+            "success": False,
+            "error": {"code": "MISSING_FILE", "message": "No image uploaded (multipart field name: 'image')"}
+        }), 400
+
+    image_file = request.files["image"]
+    if not image_file.filename:
+        return jsonify({
+            "success": False,
+            "error": {"code": "EMPTY_FILE", "message": "Uploaded image file is empty"}
+        }), 400
+
+    try:
+        from handwritten_ocr import HandwrittenTextExtractor
+        extractor = HandwrittenTextExtractor()
+
+        image_bytes = image_file.read()
+        result = extractor.extract_from_written_image(image_bytes, preprocess=True)
+        audio_url = _speak_helper(result.get("spoken_summary", ""))
+
+        result["audio_url"] = audio_url
+        return jsonify({
+            "success": True,
+            "result": result,
+            "spoken_summary": result.get("spoken_summary"),
+            "audio_url": audio_url
+        }), 200
+    except ValueError as ve:
+        return jsonify({"success": False, "error": {"code": "INVALID_INPUT", "message": str(ve)}}), 400
+    except Exception as e:
+        logger.exception("Error in /api/extract_handwritten_address: %s", e)
         return jsonify({"success": False, "error": {"code": "INTERNAL_ERROR", "message": str(e)}}), 500
 
 

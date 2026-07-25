@@ -162,15 +162,41 @@ def extract_address(file_bytes: bytes, filename: str, api_key: Optional[str] = N
     elif parsed["type"] == "text":
         contents.append(f"\nDOCUMENT CONTENT:\n{parsed['text']}")
 
-    try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
-    except Exception as e:
-        logger.error("Gemini address extraction error: %s", e)
-        raise RuntimeError(f"Gemini address extraction error: {e}") from e
+    from config import FALLBACK_GEMINI_MODELS
+
+    models_to_try = [GEMINI_MODEL] + [m for m in FALLBACK_GEMINI_MODELS if m != GEMINI_MODEL]
+    response = None
+    last_error = None
+
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            if response and response.text:
+                break
+        except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota" in err_msg:
+                logger.warning("Gemini model %s hit rate limit (429). Retrying fallback model...", model_name)
+                last_error = e
+                continue
+            else:
+                logger.error("Gemini address extraction error: %s", e)
+                raise RuntimeError(f"Gemini address extraction error: {e}") from e
+
+    if not response and last_error:
+        err_str = str(last_error)
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+            return {
+                "extracted_address": "",
+                "building_or_place_name": None,
+                "landmark": None,
+                "confidence": "low",
+                "notice": "Gemini API rate limit reached. Please wait a moment before trying again."
+            }
 
     raw_response = response.text.strip() if response and response.text else "{}"
     try:
@@ -271,13 +297,6 @@ def run_doc_navigator_ui():
             help="Upload a street sign photo, invoice PDF, or Word document containing an address."
         )
 
-        google_key_input = st.text_input(
-            "Google Maps API Key (Optional)",
-            value=GOOGLE_MAPS_API_KEY,
-            type="password",
-            help="Enter your Google Maps API Key for high-precision geocoding. Falls back to free Nominatim if empty."
-        )
-
         btn_auto_locate = st.button("📖 Read Address & Start Navigation", type="primary", use_container_width=True)
 
     with col2:
@@ -304,7 +323,7 @@ def run_doc_navigator_ui():
 
                             # GPS Geocoding Step
                             with st.spinner("Geocoding coordinates via GPS Link..."):
-                                gps_result = geocode_address_gps(extracted_addr, maps_api_key=google_key_input)
+                                gps_result = geocode_address_gps(extracted_addr, maps_api_key=GOOGLE_MAPS_API_KEY)
 
                                 if gps_result:
                                     lat, lng = gps_result["lat"], gps_result["lng"]

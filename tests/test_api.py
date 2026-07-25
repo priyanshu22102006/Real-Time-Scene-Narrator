@@ -117,7 +117,49 @@ def test_ask_assistant_missing_file(client):
     assert data["error"]["code"] == "MISSING_FILE"
 
 
+def test_live_navigation_tick_endpoint(client):
+    """Verify /api/live_navigation_tick processes ticks even without frame data gracefully."""
+    response = client.post("/api/live_navigation_tick", data={"step_index": "0"})
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["success"] is True
+    assert "alerts" in data
+    assert "current_step_index" in data
 
+
+def test_guidance_system_engine():
+    """Verify VoiceGuidedNavigationSystem session state and tick processing."""
+    from guidance_system import VoiceGuidedNavigationSystem
+    system = VoiceGuidedNavigationSystem()
+    result = system.process_live_navigation_tick(
+        session_id="test_session",
+        frame_bytes=b"",
+        step_index=0
+    )
+    assert result["success"] is True
+    assert isinstance(result["alerts"], list)
+
+
+def test_extract_handwritten_address_missing_file(client):
+    """Verify missing file handling in /api/extract_handwritten_address."""
+    response = client.post("/api/extract_handwritten_address")
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["success"] is False
+    assert data["error"]["code"] == "MISSING_FILE"
+
+
+def test_handwritten_ocr_module():
+    """Verify HandwrittenTextExtractor initialization and spoken summary formatting."""
+    from handwritten_ocr import HandwrittenTextExtractor
+    extractor = HandwrittenTextExtractor()
+    summary = extractor.build_spoken_summary({
+        "extracted_address": "123 Main Street, Boston",
+        "recipient_name": "John Doe",
+        "additional_notes": "Urgent delivery"
+    })
+    assert "123 Main Street" in summary
+    assert "John Doe" in summary
 
 
 def test_audio_manager_lifecycle(tmp_path):

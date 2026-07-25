@@ -77,17 +77,35 @@ INSTRUCTIONS:
 Do not mention that you are analyzing an image — answer as if standing right next to the user.
 """
 
-    try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[prompt, image_part],
-        )
-        if not response or not response.text:
-            return "I am unable to clearly see an answer to your question in this view."
-        return response.text.strip()
-    except Exception as e:
-        logger.error("Gemini ask_ai_assistant error: %s", e)
-        raise RuntimeError(f"AI Assistant service error: {e}") from e
+    from config import FALLBACK_GEMINI_MODELS
+
+    models_to_try = [GEMINI_MODEL] + [m for m in FALLBACK_GEMINI_MODELS if m != GEMINI_MODEL]
+    last_error = None
+
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[prompt, image_part],
+            )
+            if response and response.text:
+                return response.text.strip()
+        except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota" in err_msg:
+                logger.warning("Gemini model %s hit rate limit (429). Retrying fallback model...", model_name)
+                last_error = e
+                continue
+            else:
+                logger.error("Gemini ask_ai_assistant error: %s", e)
+                raise RuntimeError(f"AI Assistant service error: {e}") from e
+
+    if last_error:
+        err_str = str(last_error)
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+            return "Gemini AI rate limit reached. Please wait 30 seconds before asking another question."
+
+    return "I am unable to clearly see an answer to your question in this view."
 
 
 if __name__ == "__main__":

@@ -79,17 +79,35 @@ FORMAT: Be direct, calm, and reassuring. Use spatial terms (left, right, straigh
 EXAMPLE: "Continue straight for 10 meters, but stay to the left to avoid a parked car on the sidewalk."
 """
 
-        try:
-            response = self._client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt, image_part],
-            )
-            if not response or not response.text:
-                return "Proceed with caution. Unable to analyze camera stream clearly."
-            return response.text.strip()
-        except Exception as e:
-            logger.error("Error generating fused guidance: %s", e)
-            raise RuntimeError(f"Guidance AI service error: {e}") from e
+        from config import FALLBACK_GEMINI_MODELS
+
+        models_to_try = [self.model_name] + [m for m in FALLBACK_GEMINI_MODELS if m != self.model_name]
+        last_error = None
+
+        for model_name in models_to_try:
+            try:
+                response = self._client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt, image_part],
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                err_msg = str(e)
+                if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "Quota" in err_msg:
+                    logger.warning("Guidance AI model %s hit rate limit (429). Retrying fallback model...", model_name)
+                    last_error = e
+                    continue
+                else:
+                    logger.error("Error generating fused guidance: %s", e)
+                    raise RuntimeError(f"Guidance AI service error: {e}") from e
+
+        if last_error:
+            err_str = str(last_error)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+                return f"{gps_instruction}. Stay focused on your path (AI vision quota limit reached)."
+
+        return "Proceed with caution. Unable to analyze camera stream clearly."
 
 
 if __name__ == "__main__":
