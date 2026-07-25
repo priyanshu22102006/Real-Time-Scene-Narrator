@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VisionMate — Voice-Guided Assistive System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- Top App Header -->
+  <header>
+    <div class="brand-badge">Voice-Guided Assistant</div>
+    <h1>VisionMate</h1>
+    <p>Every action, alert, and direction is spoken aloud.</p>
+  </header>
+
+  <!-- Top Action Bar -->
+  <div class="top-bar">
+    <button id="btnHelp" class="icon-btn" aria-label="Open keyboard shortcuts help">
+      <span>⌨️ Shortcuts</span>
+    </button>
+    <button id="btnStopAudio" class="icon-btn" aria-label="Stop audio speech">
+      <span>🔇 Stop Speech</span>
+    </button>
+  </div>
+
+  <main>
+    
+    <!-- Camera Viewport & Live Overlay -->
+    <section class="camera-card" aria-label="Live Camera Feed">
+      <video id="camera" class="camera-viewport" autoplay playsinline muted></video>
+      <canvas id="captureCanvas" hidden></canvas>
+      
+      <div class="camera-overlay">
+        <div class="status-tag">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="camStatusText">Camera Ready</span>
+        </div>
+        <button id="btnSwitchCam" class="cam-switch-btn" aria-label="Switch camera view">🔄 Flip Camera</button>
+      </div>
+    </section>
+
+    <!-- Spoken Announcements & Live Audio Visualizer -->
+    <section class="announcement-card" aria-live="assertive" aria-label="Status Announcements" role="region">
+      <div class="announcement-content">
+        <div class="announcement-label">Live Audio Feedback</div>
+        <div id="statusText" class="announcement-text">VisionMate ready. Select a feature below or use hotkeys.</div>
+      </div>
+      <div id="audioWave" class="audio-wave hidden" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <audio id="audioPlayer" hidden></audio>
+
+    <!-- Feature Grid -->
+    <div class="features-grid">
+      
+      <!-- Feature 4: Describe Scene -->
+      <section class="feature-card" aria-label="Describe Surroundings">
+        <div class="feature-header">
+          <h2 class="feature-title">Describe Surroundings</h2>
+          <span class="shortcut-badge">Alt + D</span>
+        </div>
+        <button id="btnDescribe" class="btn-action">
+          <span>📷 Describe Scene</span>
+        </button>
+      </section>
+
+      <!-- Feature 3: Read Sign or Address -->
+      <section class="feature-card" aria-label="Read Sign or Address">
+        <div class="feature-header">
+          <h2 class="feature-title">Read Sign / Address</h2>
+          <span class="shortcut-badge">Alt + A</span>
+        </div>
+        <button id="btnAddress" class="btn-action">
+          <span>🪧 Read Sign / Address</span>
+        </button>
+      </section>
+
+      <!-- Feature 2: Hazard Detection -->
+      <section class="feature-card" aria-label="Moving Hazard Alerts">
+        <div class="feature-header">
+          <h2 class="feature-title">Moving Hazard Alerts</h2>
+          <span class="shortcut-badge">Alt + H</span>
+        </div>
+        <button id="btnHazardToggle" class="btn-action">
+          <span>🚗 Start Hazard Detection</span>
+        </button>
+      </section>
+
+      <!-- Dedicated Ambience Mode Switch -->
+      <section class="feature-card" aria-label="Ambience Mode Object & Proximity Detection">
+        <div class="feature-header">
+          <h2 class="feature-title">Ambience Mode (Everyday Objects & Proximity)</h2>
+          <span class="shortcut-badge">Alt + E</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 12px;">
+          Scans for bottles, fruits, laptop bags, cars, tech, furniture, and warns when objects get too close.
+        </p>
+        <button id="btnAmbienceToggle" class="btn-action">
+          <span>👁️ Start Ambience Mode</span>
+        </button>
+      </section>
+
+
+      <!-- Feature 1: Walking Navigation -->
+      <section class="feature-card" aria-label="Walking Directions">
+        <div class="feature-header">
+          <h2 class="feature-title">Walking Directions</h2>
+          <span class="shortcut-badge">Alt + N</span>
+        </div>
+        <div class="nav-input-group">
+          <label for="startAddressInput">Start Address (Optional, defaults to Auto GPS)</label>
+          <input type="text" id="startAddressInput" class="text-input" placeholder="e.g. Current Location or Times Square, NY" aria-label="Start Address" />
+          <label for="destinationInput">Destination Address</label>
+          <input type="text" id="destinationInput" class="text-input" placeholder="e.g. Empire State Building, New York" aria-label="Destination Address" />
+        </div>
+        <button id="btnNavigate" class="btn-action" style="margin-bottom: 12px;">
+          <span>🚶 Get Directions</span>
+        </button>
+
+        <!-- Active Turn Step Recitation Controls -->
+        <div id="stepControlsContainer" class="step-controls hidden">
+          <div class="step-status-bar">
+            <span id="stepCounterText">Step 1 of 1</span>
+            <span id="stepDistanceBadge" class="shortcut-badge">--</span>
+          </div>
+          <div id="activeStepInstruction" class="step-instruction-box">
+            No route calculated yet. Enter a destination above.
+          </div>
+          <div class="step-btn-group">
+            <button id="btnPrevStep" class="btn-secondary">⬅️ Prev</button>
+            <button id="btnReadStep" class="btn-secondary" style="background: var(--accent-yellow); color: var(--text-dark);">🔊 Read Step</button>
+            <button id="btnNextStep" class="btn-secondary">Next ➡️</button>
+          </div>
+          <button id="btnOpenLiveMaps" class="btn-secondary" style="width: 100%; margin-top: 10px;">
+            🗺️ Open Live Google Maps
+          </button>
+        </div>
+      </section>
+
+
+
+      <!-- Feature 5: Fused Sighted Guide -->
+      <section class="feature-card" aria-label="Fused Sighted Guide">
+        <div class="feature-header">
+          <h2 class="feature-title">Fused Sighted Guide</h2>
+          <span class="shortcut-badge">Alt + G</span>
+        </div>
+        <div class="nav-input-group">
+          <label for="gpsInstructionInput">Current GPS Step</label>
+          <input type="text" id="gpsInstructionInput" class="text-input" value="Walk straight for 50 meters" placeholder="e.g. Walk straight for 50 meters" aria-label="Current GPS Step" />
+          <label for="personalContextInput">Personal Context (Optional)</label>
+          <input type="text" id="personalContextInput" class="text-input" placeholder="e.g. Carrying a white cane" aria-label="Personal Context" />
+        </div>
+        <button id="btnFusedGuidance" class="btn-action">
+          <span>🚀 Get Fused Guidance</span>
+        </button>
+      </section>
+
+      <!-- Feature 6: Document & Image-to-GPS Navigator -->
+      <section class="feature-card" aria-label="Document Reader and GPS Navigator">
+        <div class="feature-header">
+          <h2 class="feature-title">Doc Reader & GPS Nav</h2>
+          <span class="shortcut-badge">Alt + U</span>
+        </div>
+        <div class="nav-input-group">
+          <label for="docFileInput">Upload Document / Image (JPG, PNG, PDF, DOCX)</label>
+          <input type="file" id="docFileInput" class="text-input" accept=".jpg,.jpeg,.png,.webp,.pdf,.docx" aria-label="Upload Document" />
+          <label for="googleMapsKeyInput">Google Maps API Key (Optional)</label>
+          <input type="password" id="googleMapsKeyInput" class="text-input" placeholder="Optional Google Maps Key" aria-label="Google Maps Key" />
+        </div>
+        <button id="btnProcessDoc" class="btn-action">
+          <span>📖 Read Address & Start Navigation</span>
+        </button>
+      </section>
+
+      <!-- Feature 7: Conversational AI Vision Assistant -->
+      <section class="feature-card" aria-label="Interactive AI Vision Voice Assistant">
+        <div class="feature-header">
+          <h2 class="feature-title">Ask AI Vision Assistant</h2>
+          <span class="shortcut-badge">Alt + Q</span>
+        </div>
+        <div class="nav-input-group">
+          <label for="aiQuestionInput">Ask any question about your surroundings or camera view</label>
+          <input type="text" id="aiQuestionInput" class="text-input" placeholder="e.g. What color is the shirt in front of me?" aria-label="Ask Question" />
+        </div>
+        <div class="preset-chips">
+          <button class="chip-btn" data-question="What is in front of me?">❓ What's in front of me?</button>
+          <button class="chip-btn" data-question="Where is the exit or doorway?">🚪 Where is the exit?</button>
+          <button class="chip-btn" data-question="Read the text label clearly">🏷️ Read label text</button>
+          <button class="chip-btn" data-question="Is it safe to step forward?">🛑 Is it safe to step forward?</button>
+        </div>
+        <button id="btnAskAssistant" class="btn-action">
+          <span>💬 Ask AI Assistant</span>
+        </button>
+      </section>
+
+
+
+
+    </div>
+
+  </main>
+
+  <!-- Shortcuts Modal -->
+  <div id="shortcutsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <h2 id="modalTitle">Keyboard Shortcuts</h2>
+      <ul class="shortcut-list">
+        <li class="shortcut-item"><span>Describe Scene</span><span class="shortcut-key">Alt + D</span></li>
+        <li class="shortcut-item"><span>Read Address / Sign</span><span class="shortcut-key">Alt + A</span></li>
+        <li class="shortcut-item"><span>Toggle Hazard Alert</span><span class="shortcut-key">Alt + H</span></li>
+        <li class="shortcut-item"><span>Get Directions</span><span class="shortcut-key">Alt + N</span></li>
+        <li class="shortcut-item"><span>Stop Speech Audio</span><span class="shortcut-key">Alt + S</span></li>
+        <li class="shortcut-item"><span>Close Help Modal</span><span class="shortcut-key">Esc</span></li>
+      </ul>
+      <button id="btnCloseModal" class="btn-action">Close Shortcuts</button>
+    </div>
+  </div>
+
+  <footer>
+    <p>VisionMate Voice Assistant &bull; Powered by Gemini AI & YOLO Multi-User Hazard Detection</p>
+  </footer>
+
+</div>
+
+<script>
+// --- Session ID Management ---------------------------------------------------
+function getOrCreateSessionId() {
+  let sid = localStorage.getItem('visionmate_session_id');
+  if (!sid) {
+    sid = 'client_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+    localStorage.setItem('visionmate_session_id', sid);
+  }
+  return sid;
+}
+const CLIENT_SESSION_ID = getOrCreateSessionId();
+
+// --- DOM Elements -------------------------------------------------------------
+const video = document.getElementById('camera');
+const canvas = document.getElementById('captureCanvas');
+const audioPlayer = document.getElementById('audioPlayer');
+const statusText = document.getElementById('statusText');
+const audioWave = document.getElementById('audioWave');
+const statusDot = document.getElementById('statusDot');
+const camStatusText = document.getElementById('camStatusText');
+
+// --- Audio & Web Speech API Speech Synthesis ----------------------------------
+let synth = window.speechSynthesis;
+
+function stopAllAudio() {
+  if (synth && synth.speaking) {
+    synth.cancel();
+  }
+  audioPlayer.pause();
+  audioPlayer.currentTime = 0;
+  audioWave.classList.add('hidden');
+}
+
+function speakText(text, audioUrl = null) {
+  stopAllAudio();
+  statusText.textContent = text;
+  audioWave.classList.remove('hidden');
+
+  if (audioUrl) {
+    audioPlayer.src = audioUrl;
+    audioPlayer.play().then(() => {
+      audioPlayer.onended = () => audioWave.classList.add('hidden');
+    }).catch(err => {
+      console.warn('Server audio playback failed, triggering browser Web Speech fallback:', err);
+      fallbackWebSpeech(text);
+    });
+  } else {
+    fallbackWebSpeech(text);
+  }
+}
+
+function fallbackWebSpeech(text) {
+  if (!synth) {
+    audioWave.classList.add('hidden');
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  utterance.onend = () => audioWave.classList.add('hidden');
+  utterance.onerror = () => audioWave.classList.add('hidden');
+  synth.speak(utterance);
+}
+
+// --- Camera Handling & Switching ---------------------------------------------
+let currentStream = null;
+let currentFacingMode = 'environment';
+
+async function initCamera(facingMode = 'environment') {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+  }
+
+  try {
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+    } catch (modeErr) {
+      console.warn('FacingMode constraint failed, trying default webcam stream:', modeErr);
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    }
+    video.srcObject = currentStream;
+    camStatusText.textContent = 'Camera Active';
+    statusDot.className = 'status-dot';
+  } catch (err) {
+    console.error('Camera init error:', err);
+    camStatusText.textContent = 'Camera Unavailable';
+    statusText.textContent = 'Camera access error: ' + err.message + '. Please allow camera access in your browser.';
+  }
+}
+
+
+document.getElementById('btnSwitchCam').addEventListener('click', () => {
+  currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+  initCamera(currentFacingMode);
+});
+
+initCamera();
+
+function captureFrameBlob() {
+  return new Promise((resolve) => {
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+  });
+}
+
+// --- Feature 4: Describe Scene -----------------------------------------------
+document.getElementById('btnDescribe').addEventListener('click', async () => {
+  speakText('Analyzing your surroundings...');
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('image', blob, 'scene.jpg');
+
+    const resp = await fetch('/api/describe_scene', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      speakText(result.error?.message || 'Failed to describe scene.');
+      return;
+    }
+    speakText(result.description, result.audio_url);
+  } catch (err) {
+    speakText('Network error analyzing scene. Please try again.');
+  }
+});
+
+// --- Feature 3: Read Sign or Address ------------------------------------------
+document.getElementById('btnAddress').addEventListener('click', async () => {
+  speakText('Reading sign or address text...');
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('image', blob, 'sign.jpg');
+
+    const resp = await fetch('/api/read_address', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      speakText(result.error?.message || 'Failed to read address.');
+      return;
+    }
+    speakText(result.speech, result.audio_url);
+  } catch (err) {
+    speakText('Network error reading address sign.');
+  }
+});
+
+// --- Feature 2: Hazard Detection Loop -----------------------------------------
+let hazardActive = false;
+let hazardInterval = null;
+const btnHazardToggle = document.getElementById('btnHazardToggle');
+
+async function checkHazardTick() {
+  if (!hazardActive) return;
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('frame', blob, 'frame.jpg');
+
+    const resp = await fetch('/api/detect_objects', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (result.success && result.alerts && result.alerts.length > 0) {
+      const alertMsg = result.alerts.map(a => a.message).join(' ');
+      speakText(alertMsg, result.audio_url);
+    }
+  } catch (err) {
+    console.warn('Hazard tick error:', err);
+  }
+}
+
+function toggleHazardDetection() {
+  hazardActive = !hazardActive;
+  if (hazardActive) {
+    btnHazardToggle.innerHTML = '<span>🛑 Stop Hazard Detection</span>';
+    btnHazardToggle.classList.add('active-danger');
+    statusDot.className = 'status-dot active';
+    camStatusText.textContent = 'Hazard Scanner Active';
+    speakText('Hazard detection started. Scanning for moving vehicles.');
+    hazardInterval = setInterval(checkHazardTick, 500);
+  } else {
+    clearInterval(hazardInterval);
+    btnHazardToggle.innerHTML = '<span>🚗 Start Hazard Detection</span>';
+    btnHazardToggle.classList.remove('active-danger');
+    statusDot.className = 'status-dot';
+    camStatusText.textContent = 'Camera Ready';
+    speakText('Hazard detection stopped.');
+  }
+}
+
+btnHazardToggle.addEventListener('click', toggleHazardDetection);
+
+// --- Feature 1: Navigation with Interactive Step Controls ----------------------
+let currentNavRoute = null;
+let currentStepIndex = 0;
+
+const stepControlsContainer = document.getElementById('stepControlsContainer');
+const stepCounterText = document.getElementById('stepCounterText');
+const stepDistanceBadge = document.getElementById('stepDistanceBadge');
+const activeStepInstruction = document.getElementById('activeStepInstruction');
+const btnPrevStep = document.getElementById('btnPrevStep');
+const btnNextStep = document.getElementById('btnNextStep');
+const btnReadStep = document.getElementById('btnReadStep');
+const btnOpenLiveMaps = document.getElementById('btnOpenLiveMaps');
+
+function updateStepUI() {
+  if (!currentNavRoute || !currentNavRoute.voice_commands || currentNavRoute.voice_commands.length === 0) {
+    stepControlsContainer.classList.add('hidden');
+    return;
+  }
+
+  stepControlsContainer.classList.remove('hidden');
+  const commands = currentNavRoute.voice_commands;
+  const total = commands.length;
+
+  if (currentStepIndex < 0) currentStepIndex = 0;
+  if (currentStepIndex >= total) currentStepIndex = total - 1;
+
+  stepCounterText.textContent = `Step ${currentStepIndex + 1} of ${total}`;
+  stepDistanceBadge.textContent = currentNavRoute.total_distance || '';
+  activeStepInstruction.textContent = commands[currentStepIndex];
+
+  btnPrevStep.disabled = (currentStepIndex === 0);
+  btnNextStep.disabled = (currentStepIndex === total - 1);
+}
+
+btnPrevStep.addEventListener('click', () => {
+  if (currentNavRoute && currentStepIndex > 0) {
+    currentStepIndex--;
+    updateStepUI();
+    speakText(currentNavRoute.voice_commands[currentStepIndex]);
+  }
+});
+
+btnNextStep.addEventListener('click', () => {
+  if (currentNavRoute && currentStepIndex < currentNavRoute.voice_commands.length - 1) {
+    currentStepIndex++;
+    updateStepUI();
+    speakText(currentNavRoute.voice_commands[currentStepIndex]);
+  }
+});
+
+btnReadStep.addEventListener('click', () => {
+  if (currentNavRoute && currentNavRoute.voice_commands[currentStepIndex]) {
+    speakText(currentNavRoute.voice_commands[currentStepIndex]);
+  }
+});
+
+btnOpenLiveMaps.addEventListener('click', () => {
+  if (currentNavRoute && currentNavRoute.maps_url) {
+    window.open(currentNavRoute.maps_url, '_blank');
+  }
+});
+
+document.getElementById('btnNavigate').addEventListener('click', () => {
+  const destination = document.getElementById('destinationInput').value.trim();
+  const startInput = document.getElementById('startAddressInput').value.trim();
+
+  if (!destination) {
+    speakText('Please enter a destination address first.');
+    document.getElementById('destinationInput').focus();
+    return;
+  }
+
+  const runNavigationRequest = async (startVal) => {
+    speakText('Calculating live walking directions to ' + destination + '...');
+    try {
+      const resp = await fetch('/api/navigate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-ID': CLIENT_SESSION_ID
+        },
+        body: JSON.stringify({ start: startVal, destination: destination })
+      });
+      const result = await resp.json();
+      if (!result.success) {
+        speakText(result.error?.message || 'Could not calculate navigation route.');
+        return;
+      }
+
+      currentNavRoute = result;
+      currentStepIndex = 0;
+      updateStepUI();
+
+      // Automatically redirect to Google Maps live navigation in a new tab
+      if (result.maps_url) {
+        window.open(result.maps_url, '_blank');
+      }
+
+      speakText(result.narration, result.audio_url);
+    } catch (err) {
+      speakText('Network error calculating directions.');
+    }
+  };
+
+  if (startInput) {
+    runNavigationRequest(startInput);
+  } else {
+    speakText('Accessing your current GPS location...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const start = [position.coords.latitude, position.coords.longitude];
+        runNavigationRequest(start);
+      },
+      (err) => {
+        console.warn('Geolocation failed:', err);
+        speakText('Browser GPS unavailable. Using start location fallback...');
+        runNavigationRequest('Current Location');
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  }
+});
+
+
+
+// --- Feature 5: Fused Guidance ------------------------------------------------
+document.getElementById('btnFusedGuidance').addEventListener('click', async () => {
+  const gpsInstruction = document.getElementById('gpsInstructionInput').value.trim() || 'Walk straight';
+  const personalContext = document.getElementById('personalContextInput').value.trim();
+
+  speakText('Analyzing camera view with GPS navigation instruction...');
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('image', blob, 'guidance_frame.jpg');
+    form.append('gps_instruction', gpsInstruction);
+    form.append('personal_context', personalContext);
+
+    const resp = await fetch('/api/fused_guidance', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      speakText(result.error?.message || 'Failed to generate fused guidance.');
+      return;
+    }
+    speakText(result.guidance, result.audio_url);
+  } catch (err) {
+    speakText('Network error generating fused guidance.');
+  }
+});
+
+// --- Feature 6: Document & Image-to-GPS Navigator -----------------------------
+document.getElementById('btnProcessDoc').addEventListener('click', async () => {
+  const fileInput = document.getElementById('docFileInput');
+  if (!fileInput.files || fileInput.files.length === 0) {
+    speakText('Please select an Image, PDF, or Word document file first.');
+    fileInput.focus();
+    return;
+  }
+  const file = fileInput.files[0];
+  const mapsKey = document.getElementById('googleMapsKeyInput').value.trim();
+
+  speakText('Extracting address from document and resolving GPS coordinates...');
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('google_maps_key', mapsKey);
+
+    const resp = await fetch('/api/process_document', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      speakText(result.error?.message || 'Failed to process document.');
+      return;
+    }
+    speakText(result.speech, result.audio_url);
+  } catch (err) {
+    speakText('Network error processing document file.');
+  }
+});
+
+// --- Feature 7: AI Vision Voice Assistant ------------------------------------
+document.querySelectorAll('.chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const q = btn.getAttribute('data-question');
+    if (q) {
+      document.getElementById('aiQuestionInput').value = q;
+      document.getElementById('btnAskAssistant').click();
+    }
+  });
+});
+
+document.getElementById('btnAskAssistant').addEventListener('click', async () => {
+  const question = document.getElementById('aiQuestionInput').value.trim() || 'What is in front of me?';
+
+  speakText('Analyzing camera view to answer: ' + question + '...');
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('image', blob, 'assistant_frame.jpg');
+    form.append('question', question);
+
+    const resp = await fetch('/api/ask_assistant', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (!result.success) {
+      speakText(result.error?.message || 'Failed to get answer from AI Assistant.');
+      return;
+    }
+    speakText(result.answer, result.audio_url);
+  } catch (err) {
+    speakText('Network error communicating with AI Assistant.');
+  }
+});
+
+// --- Ambience Mode Switch & Proximity Alerts -----------------------------------
+let ambienceActive = false;
+let ambienceInterval = null;
+const btnAmbienceToggle = document.getElementById('btnAmbienceToggle');
+
+async function checkAmbienceTick() {
+  if (!ambienceActive) return;
+  try {
+    const blob = await captureFrameBlob();
+    const form = new FormData();
+    form.append('frame', blob, 'ambience_frame.jpg');
+
+    const resp = await fetch('/api/detect_objects', {
+      method: 'POST',
+      headers: { 'X-Client-ID': CLIENT_SESSION_ID },
+      body: form
+    });
+    const result = await resp.json();
+    if (result.success && result.alerts && result.alerts.length > 0) {
+      const alertMsg = result.alerts.map(a => a.message).join(' ');
+      speakText(alertMsg, result.audio_url);
+    }
+  } catch (err) {
+    console.warn('Ambience tick error:', err);
+  }
+}
+
+function toggleAmbienceMode() {
+  ambienceActive = !ambienceActive;
+  if (ambienceActive) {
+    btnAmbienceToggle.innerHTML = '<span>🛑 Stop Ambience Mode</span>';
+    btnAmbienceToggle.classList.add('active-danger');
+    statusDot.className = 'status-dot active';
+    camStatusText.textContent = 'Ambience Mode Active';
+    speakText('Ambience Mode activated. Monitoring bottles, fruits, laptop bags, vehicles, and close objects.');
+    ambienceInterval = setInterval(checkAmbienceTick, 500);
+  } else {
+    clearInterval(ambienceInterval);
+    btnAmbienceToggle.innerHTML = '<span>👁️ Start Ambience Mode</span>';
+    btnAmbienceToggle.classList.remove('active-danger');
+    statusDot.className = 'status-dot';
+    camStatusText.textContent = 'Camera Ready';
+    speakText('Ambience Mode stopped.');
+  }
+}
+
+btnAmbienceToggle.addEventListener('click', toggleAmbienceMode);
+
+// --- Keyboard Hotkeys & Modal Controls ----------------------------------------
+const modal = document.getElementById('shortcutsModal');
+document.getElementById('btnHelp').addEventListener('click', () => modal.classList.remove('hidden'));
+document.getElementById('btnCloseModal').addEventListener('click', () => modal.classList.add('hidden'));
+document.getElementById('btnStopAudio').addEventListener('click', stopAllAudio);
+
+window.addEventListener('keydown', (e) => {
+  if (e.altKey) {
+    const key = e.key.toLowerCase();
+    if (key === 'd') {
+      e.preventDefault();
+      document.getElementById('btnDescribe').click();
+    } else if (key === 'a') {
+      e.preventDefault();
+      document.getElementById('btnAddress').click();
+    } else if (key === 'h') {
+      e.preventDefault();
+      document.getElementById('btnHazardToggle').click();
+    } else if (key === 'e') {
+      e.preventDefault();
+      document.getElementById('btnAmbienceToggle').click();
+    } else if (key === 'n') {
+      e.preventDefault();
+      document.getElementById('btnNavigate').click();
+    } else if (key === 'g') {
+      e.preventDefault();
+      document.getElementById('btnFusedGuidance').click();
+    } else if (key === 'u') {
+      e.preventDefault();
+      document.getElementById('btnProcessDoc').click();
+    } else if (key === 'q') {
+      e.preventDefault();
+      document.getElementById('btnAskAssistant').click();
+    } else if (key === 's') {
+      e.preventDefault();
+      stopAllAudio();
+      statusText.textContent = 'Audio muted.';
+    }
+  } else if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+    modal.classList.add('hidden');
+  }
+});
+
+
+
+
+</script>
+
+</body>
+</html>
