@@ -1,5 +1,15 @@
 {
+  "name": "real-time-scene-narrator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev": "npx concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend"
+  },
   "dependencies": {
+    "concurrently": "^8.2.2",
     "express": "^5.2.1",
     "multer": "^2.2.0",
     "onnxruntime-node": "^1.27.0",

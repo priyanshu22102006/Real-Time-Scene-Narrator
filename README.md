@@ -6,10 +6,12 @@ An AI-powered accessibility tool that converts a live camera feed into spoken na
 
 ## ✨ Features
 
-- **Camera-to-Voice** — Captures camera frames every 2 seconds and speaks AI-generated scene descriptions via ElevenLabs
-- **Ambient Mode** — In-browser TensorFlow.js COCO-SSD detects approaching obstacles (cars, people, cyclists) and alerts instantly
-- **Task Mode** — Point at signs or documents; AI extracts text and addresses, reads them aloud, and can auto-launch GPS navigation
-- **GPS Navigation** — Turn-by-turn voice guidance using OpenStreetMap routing; speaks instructions as you approach each waypoint
+- **🤖 Dedicated AI Integration (All-in-One)** — Single master button running Object Detection, Visual Scene Narration, GPS Visual Fusion, and Mood & Sitting Idle Medical Emergency Alerting simultaneously.
+- **📷 Camera-to-Voice** — Captures camera frames every 2 seconds and speaks AI-generated scene descriptions via ElevenLabs.
+- **⚡ Ambient Mode** — In-browser TensorFlow.js COCO-SSD detects approaching obstacles (cars, people, cyclists) and alerts instantly.
+- **📋 Task Mode** — Point at signs or documents; AI extracts text and addresses, reads them aloud, and can auto-launch GPS navigation.
+- **🗺️ GPS Navigation** — Turn-by-turn voice guidance using OpenStreetMap routing; speaks instructions as you approach each waypoint.
+- **🚨 Medical Emergency Alerting** — Tracks human posture and sitting idle duration; flags critical medical distress alerts if unresponsive for >10s.
 
 ---
 
@@ -23,11 +25,11 @@ An AI-powered accessibility tool that converts a live camera feed into spoken na
 | Object Detection | TensorFlow.js COCO-SSD | In-browser real-time detection |
 | Maps | Leaflet.js | Interactive route maps |
 | Backend | Node.js + Express | API server |
+| **Python Edge AI** | **YOLOv8 Nano (Ultralytics)** | Custom fine-tuned edge AI & posture tracking (`train_model.py`, `ai_inference.py`) |
 | **Vision API** | **Google Gemini 2.5 Flash** | Scene description & OCR |
 | **Text-to-Speech** | **ElevenLabs (Turbo v2)** | Ultra-realistic AI voice output |
 | **Geocoding** | **OpenStreetMap Nominatim** | Address → coordinates (free, no key) |
 | **Routing** | **OSRM** | Turn-by-turn directions (free, no key) |
-| **Object Detection (Backend)** | **YOLOv11n (ONNX Runtime)** | Server-side object detection |
 
 ---
 
@@ -87,9 +89,32 @@ We use **OpenStreetMap Nominatim** (geocoding) and **OSRM** (routing) — both a
 - **Nominatim:** Max 1 request/second per IP (our backend rate limiter handles this)
 - **OSRM:** Public demo server, no key required, generous limits for non-commercial use
 
+## ⚡ Single Command Quick Start — Run Entire Application
+
+To run the entire setup (backend + frontend) in a **single command**:
+
+```bash
+# 1. Set up backend environment file (first time only)
+cp .env.example backend/.env
+
+# 2. Run both Backend & Frontend simultaneously with ONE command:
+npm run dev
+```
+
+> 🚀 **Backend runs on:** `http://localhost:5000`  
+> 🌐 **Frontend runs on:** `http://localhost:5173`
+
 ---
 
-## 🚀 Installation & Setup
+### (Optional) Setup Python AI Perception Models:
+```bash
+pip install -r requirements_ai.txt
+python train_model.py
+```
+
+---
+
+## 🚀 Detailed Installation & Setup Guide
 
 Follow these steps in order to get the project running locally.
 
@@ -240,6 +265,7 @@ Click **"Try Live Demo"** to open the app.
 
 1. **Start Camera** — Click "Start Camera" and allow browser camera permission
 2. **Select a Mode** using the tab buttons:
+   - **🤖 AI Integration (All-in-One)**: Click **"⚡ Run All AI Features"** to execute Object Detection, Scene Narration, GPS Context, and Sitting Idle Emergency Alerting simultaneously!
    - **Camera-to-Voice**: Click "Start Narration" to begin 2-second interval AI narration
    - **Ambient Mode**: Click "Start Monitoring" to load COCO-SSD and begin real-time threat detection
    - **Task Mode**: Capture or upload a photo to extract text and addresses

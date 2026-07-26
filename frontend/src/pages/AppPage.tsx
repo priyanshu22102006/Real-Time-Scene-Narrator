@@ -6,13 +6,21 @@ import CameraToVoice from '../modules/CameraToVoice';
 import AmbientMode from '../modules/AmbientMode';
 import TaskMode from '../modules/TaskMode';
 import GPSNavigation from '../modules/GPSNavigation';
+import AIIntegration from '../modules/AIIntegration';
 import DetectionOverlay from '../components/DetectionOverlay';
 import type { TrackedDetection } from '../utils/detectionTracker';
 
 // ─── Mode definitions ──────────────────────────────────────────────────────────
-type AppMode = 'camera-voice' | 'ambient' | 'task' | 'gps';
+type AppMode = 'camera-voice' | 'ambient' | 'task' | 'gps' | 'ai-integration';
 
 const modes: { id: AppMode; label: string; icon: string; description: string; color: string }[] = [
+  {
+    id: 'ai-integration',
+    label: 'AI Integration (All-in-One)',
+    icon: '🤖',
+    description: 'Run all AI features at once',
+    color: 'from-amber-500 via-rose-500 to-purple-600',
+  },
   {
     id: 'camera-voice',
     label: 'Camera-to-Voice',
@@ -642,6 +650,9 @@ export default function AppPage() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.18, ease: 'easeOut' }}
                 >
+                  {currentMode === 'ai-integration' && (
+                    <AIIntegration videoRef={videoRef} isCameraActive={isCameraActive} />
+                  )}
                   {currentMode === 'camera-voice' && (
                     <CameraToVoice videoRef={videoRef} isCameraActive={isCameraActive} />
                   )}

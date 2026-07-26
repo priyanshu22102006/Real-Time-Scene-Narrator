@@ -1,0 +1,14 @@
+{
+  "0": "person",
+  "1": "chair",
+  "2": "table",
+  "3": "vehicle",
+  "4": "door",
+  "5": "stairs",
+  "6": "traffic_sign",
+  "7": "obstacle",
+  "8": "mood_happy",
+  "9": "mood_neutral",
+  "10": "mood_distressed",
+  "11": "sitting_idle"
+}

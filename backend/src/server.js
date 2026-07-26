@@ -10,6 +10,7 @@ import { describeScene } from './routes/describeScene.js';
 import { extractAddress } from './routes/extractAddress.js';
 import { getDirections } from './routes/directions.js';
 import { generateTTS } from './routes/tts.js';
+import { processAllInOneAI } from './routes/aiInference.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -34,7 +35,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ─── Rate Limiting ─────────────────────────────────────────────────────────────
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
-  max: 30,             // 30 requests per minute
+  max: 300,            // 300 requests per minute for real-time video feeds
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -45,7 +46,7 @@ const apiLimiter = rateLimit({
 
 const ttsLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 40,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -56,7 +57,7 @@ const ttsLimiter = rateLimit({
 
 const directionsLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -103,6 +104,9 @@ app.post('/api/tts', ttsLimiter, generateTTS);
 
 // GET /api/directions
 app.get('/api/directions', directionsLimiter, getDirections);
+
+// POST /api/ai-inference (All-in-One AI Perception & Emergency Alerting)
+app.post('/api/ai-inference', apiLimiter, upload.single('image'), processAllInOneAI);
 
 // ─── Global Error Handler ──────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
