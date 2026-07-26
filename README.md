@@ -1,12 +1,12 @@
 # 👁 Real-Time Scene Narrator
 
-An AI-powered accessibility tool that converts a live camera feed into spoken narration for visually impaired users. Combines AI vision, real-time object detection, text extraction, and GPS navigation — all powered by free, open-source APIs.
+An AI-powered accessibility tool that converts a live camera feed into spoken narration for visually impaired users. Combines **Google Gemini Vision**, **ElevenLabs TTS**, real-time object detection, text extraction, and GPS navigation — all through a modern React interface.
 
 ---
 
 ## ✨ Features
 
-- **Camera-to-Voice** — Captures camera frames every 2 seconds and speaks AI-generated scene descriptions
+- **Camera-to-Voice** — Captures camera frames every 2 seconds and speaks AI-generated scene descriptions via ElevenLabs
 - **Ambient Mode** — In-browser TensorFlow.js COCO-SSD detects approaching obstacles (cars, people, cyclists) and alerts instantly
 - **Task Mode** — Point at signs or documents; AI extracts text and addresses, reads them aloud, and can auto-launch GPS navigation
 - **GPS Navigation** — Turn-by-turn voice guidance using OpenStreetMap routing; speaks instructions as you approach each waypoint
@@ -15,112 +15,218 @@ An AI-powered accessibility tool that converts a live camera feed into spoken na
 
 ## 🛠 Tech Stack
 
-| Layer | Technology | License |
+| Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Frontend | React 18 + TypeScript + Vite | MIT |
-| Styling | Tailwind CSS v3 | MIT |
-| Animations | Framer Motion | MIT |
-| Object Detection | TensorFlow.js COCO-SSD (in-browser) | Apache 2.0 |
-| Text-to-Speech | Web Speech API (browser built-in) | Browser native |
-| Camera Access | MediaDevices getUserMedia API | Browser native |
-| Backend | Node.js + Express | MIT |
-| **Vision API** | **Hugging Face Inference API (BLIP + TrOCR)** | **Free tier** |
-| **Geocoding** | **OpenStreetMap Nominatim** | **Free, no key** |
-| **Routing** | **OSRM (Open Source Routing Machine)** | **Free, no key** |
+| Frontend | React 18 + TypeScript + Vite | UI framework & dev server |
+| Styling | Tailwind CSS v3 | Utility-first CSS |
+| Animations | Framer Motion | Smooth transitions & effects |
+| Object Detection | TensorFlow.js COCO-SSD | In-browser real-time detection |
+| Maps | Leaflet.js | Interactive route maps |
+| Backend | Node.js + Express | API server |
+| **Vision API** | **Google Gemini 2.5 Flash** | Scene description & OCR |
+| **Text-to-Speech** | **ElevenLabs (Turbo v2)** | Ultra-realistic AI voice output |
+| **Geocoding** | **OpenStreetMap Nominatim** | Address → coordinates (free, no key) |
+| **Routing** | **OSRM** | Turn-by-turn directions (free, no key) |
+| **Object Detection (Backend)** | **YOLOv11n (ONNX Runtime)** | Server-side object detection |
 
 ---
 
 ## 📋 Prerequisites
 
-- **Node.js** v18 or higher ([Download](https://nodejs.org))
-- **npm** v9+ (included with Node.js)
-- A modern browser with camera access (Chrome, Firefox, Edge, Safari)
-- A **free** Hugging Face account (for the Vision API key)
+Before you begin, make sure you have the following installed on your system:
+
+| Requirement | Version | How to Check | Download |
+|-------------|---------|-------------|----------|
+| **Node.js** | v18.0.0 or higher | `node --version` | [nodejs.org](https://nodejs.org) |
+| **npm** | v9.0.0 or higher | `npm --version` | Bundled with Node.js |
+| **Git** | Any recent version | `git --version` | [git-scm.com](https://git-scm.com) |
+
+**Browser Requirements:**
+- A modern browser with **camera access** support (Chrome, Firefox, Edge, or Safari)
+- Camera access requires **HTTPS** in production (localhost is allowed for development)
+- Chrome/Edge recommended for the best text-to-speech voice quality
 
 ---
 
-## 🔑 API Keys
+## 🔑 API Keys Setup
 
-### Hugging Face (Vision API) — Free Tier
+You will need **two** API keys before running the app. Both have generous free tiers.
 
-1. Go to [https://huggingface.co/join](https://huggingface.co/join) and create a free account
-2. Navigate to [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-3. Click **"New token"** → Name it `scene-narrator` → Role: `Read` → Create
-4. Copy the token (starts with `hf_...`)
-5. Paste it as `VISION_API_KEY` in your `.env` file
+### 1. Google Gemini API Key (Vision & OCR)
 
-**Free tier limits:**
-- ~30,000 API calls/month on the free tier
-- Models may have a "cold start" delay of 20–30 seconds after inactivity (you'll see a "model loading" message)
-- Rate limit enforced in our backend: 10 vision requests/minute per IP
+The Gemini API powers scene description and text extraction from images.
 
-### Directions API — No Key Required
+| Step | Action |
+|------|--------|
+| 1 | Go to [Google AI Studio](https://aistudio.google.com/apikey) |
+| 2 | Sign in with your Google account |
+| 3 | Click **"Create API Key"** |
+| 4 | Select or create a Google Cloud project |
+| 5 | Copy the generated API key (starts with `AIza...`) |
 
-We use **OpenStreetMap Nominatim** and **OSRM** — both are completely free with no account needed:
-- Nominatim: max 1 request/second per IP (our rate limiter ensures this)
-- OSRM: public demo server, no key, generous limits for non-commercial use
+> **Free tier limits:** 15 requests/minute, 1,500 requests/day, 1 million tokens/month — more than enough for personal use.
+
+### 2. ElevenLabs API Key (Text-to-Speech)
+
+ElevenLabs provides ultra-realistic AI voice narration.
+
+| Step | Action |
+|------|--------|
+| 1 | Go to [elevenlabs.io/sign-up](https://elevenlabs.io/sign-up) and create a free account |
+| 2 | Navigate to your [API Keys page](https://elevenlabs.io/app/settings/api-keys) |
+| 3 | Click **"Create API Key"** |
+| 4 | Name it `scene-narrator` and click **Create** |
+| 5 | Copy the key (starts with `sk_...`) |
+
+> **Free tier limits:** 10,000 characters/month with access to a selection of voices.
+
+### 3. Directions API — No Key Required ✅
+
+We use **OpenStreetMap Nominatim** (geocoding) and **OSRM** (routing) — both are completely free with no account needed:
+
+- **Nominatim:** Max 1 request/second per IP (our backend rate limiter handles this)
+- **OSRM:** Public demo server, no key required, generous limits for non-commercial use
 
 ---
 
-## 🚀 Installation
+## 🚀 Installation & Setup
 
-### 1. Clone the repository
+Follow these steps in order to get the project running locally.
+
+### Step 1 — Clone the Repository
 
 ```bash
-git clone <your-repo-url>
-cd real-time-scene-narrator
+git clone https://github.com/priyanshu22102006/Real-Time-Scene-Narrator.git
+cd Real-Time-Scene-Narrator
 ```
 
-### 2. Set up the backend
+---
+
+### Step 2 — Set Up Environment Variables
+
+Create the backend `.env` file from the provided template:
+
+```bash
+cp .env.example backend/.env
+```
+
+Now open `backend/.env` in your editor and fill in your API keys:
+
+```env
+# ─── Server Configuration ──────────────────────────────────
+PORT=5000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+# ─── Google Gemini API Key (Required) ──────────────────────
+# Used for: scene description, text/OCR extraction
+# Get yours at: https://aistudio.google.com/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# ─── ElevenLabs API Key (Required) ─────────────────────────
+# Used for: ultra-realistic AI text-to-speech narration
+# Get yours at: https://elevenlabs.io/app/settings/api-keys
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
+```
+
+> [!IMPORTANT]
+> Replace `your_gemini_api_key_here` and `your_elevenlabs_api_key_here` with your actual API keys.
+> The `ELEVENLABS_VOICE_ID` is pre-set to the "Rachel" voice — you can change this to any voice ID from your ElevenLabs account.
+
+---
+
+### Step 3 — Install Backend Dependencies
 
 ```bash
 cd backend
 npm install
-cp ../.env.example .env
-# Edit .env and add your VISION_API_KEY
 ```
 
-### 3. Set up the frontend
+This installs:
+- `express` — Web server framework
+- `axios` — HTTP client for API calls
+- `dotenv` — Environment variable loader
+- `multer` — Image upload handling
+- `onnxruntime-node` — YOLO model inference
+- `cors`, `express-rate-limit` — Security middleware
+- `nodemon` (dev) — Auto-restart on file changes
+
+---
+
+### Step 4 — Install Frontend Dependencies
 
 ```bash
 cd ../frontend
 npm install
 ```
 
----
-
-## ⚙️ Configuration
-
-Edit `backend/.env`:
-
-```env
-VISION_API_KEY=hf_your_token_here
-PORT=5000
-NODE_ENV=development
-FRONTEND_URL=http://localhost:5173
-```
+This installs:
+- `react`, `react-dom`, `react-router-dom` — UI framework & routing
+- `@tensorflow/tfjs`, `@tensorflow-models/coco-ssd` — In-browser object detection
+- `framer-motion` — Animations
+- `leaflet` — Interactive maps
+- `axios` — API calls to the backend
+- `vite`, `typescript`, `tailwindcss` (dev) — Build tooling
 
 ---
 
-## ▶️ Running the App
+### Step 5 — Start the Application
 
-Open **two terminal windows**:
+You need **two terminal windows** — one for the backend and one for the frontend.
 
-**Terminal 1 — Backend:**
+**Terminal 1 — Start the Backend Server:**
+
 ```bash
 cd backend
-npm run dev
+npm run dev        # Uses nodemon for auto-reload
+# OR
+npm start          # Uses plain node (no auto-reload)
 ```
-The backend will start on `http://localhost:5000`
 
-**Terminal 2 — Frontend:**
+✅ You should see:
+```
+🚀 Real-Time Scene Narrator Backend running on port 5000
+   Vision API: Google Gemini 2.5 Flash
+   TTS Engine: ElevenLabs AI Voice Studio
+   Directions: Nominatim (geocoding) + OSRM (routing)
+   Health check: http://localhost:5000/health
+```
+
+**Terminal 2 — Start the Frontend Dev Server:**
+
 ```bash
 cd frontend
 npm run dev
 ```
-The frontend will start on `http://localhost:5173`
 
-Open `http://localhost:5173` in your browser.
+✅ You should see:
+```
+  VITE v5.x.x  ready in XXX ms
+  ➜  Local:   http://localhost:5173/
+```
+
+---
+
+### Step 6 — Open in Browser
+
+Navigate to **[http://localhost:5173](http://localhost:5173)** in your browser.
+
+> [!TIP]
+> The Vite dev server automatically proxies all `/api/*` requests to `http://localhost:5000`, so both servers work together seamlessly in development.
+
+---
+
+## ✅ Verify Installation
+
+After starting both servers, run these quick checks:
+
+| Check | How | Expected Result |
+|-------|-----|----------------|
+| Backend is running | Open [http://localhost:5000/health](http://localhost:5000/health) | JSON with `"status": "ok"` |
+| Frontend is running | Open [http://localhost:5173](http://localhost:5173) | Landing page loads |
+| API proxy works | Open [http://localhost:5173/api/health](http://localhost:5173/api/health) via the browser console | Same JSON response as backend `/health` |
+| Camera access | Click "Start Camera" on the app page | Browser asks for camera permission |
 
 ---
 
@@ -130,44 +236,49 @@ Open `http://localhost:5173` in your browser.
 The marketing page explains all features with animated cards and demonstrations.
 Click **"Try Live Demo"** to open the app.
 
-### App (`/app`)
+### App Page (`/app`)
 
 1. **Start Camera** — Click "Start Camera" and allow browser camera permission
 2. **Select a Mode** using the tab buttons:
-   - **Camera-to-Voice**: Click "Start Narration" to begin 2-second interval narration
-   - **Ambient Mode**: Click "Start Monitoring" to load COCO-SSD and begin threat detection
+   - **Camera-to-Voice**: Click "Start Narration" to begin 2-second interval AI narration
+   - **Ambient Mode**: Click "Start Monitoring" to load COCO-SSD and begin real-time threat detection
    - **Task Mode**: Capture or upload a photo to extract text and addresses
    - **GPS Navigation**: Enter a destination address (or let Task Mode fill it automatically)
-3. All speech output uses the **Web Speech API** — works offline once the page is loaded
+3. All voice output is powered by **ElevenLabs** for natural, human-like speech
 
 ### Keyboard Shortcuts
-- `?` — Toggle help panel
-- `Esc` — Close help panel
-- `Tab` — Navigate between all interactive elements
-- `Enter` — Activate focused button
+
+| Key | Action |
+|-----|--------|
+| `?` | Toggle help panel |
+| `Esc` | Close help panel |
+| `Tab` | Navigate between interactive elements |
+| `Enter` | Activate focused button |
 
 ---
 
 ## 🏗 Build for Production
 
 ```bash
-# Build frontend
+# 1. Build the frontend
 cd frontend
 npm run build
+# Output: frontend/dist/ (deploy to any static host or CDN)
 
-# The built files are in frontend/dist/
-# Serve them with any static file server or CDN
-
-# Start backend in production
+# 2. Start the backend in production mode
 cd ../backend
 NODE_ENV=production npm start
 ```
 
-### Environment variables for production:
+### Production Environment Variables
+
 ```env
 NODE_ENV=production
+PORT=5000
 FRONTEND_URL=https://your-deployed-frontend.com
-VISION_API_KEY=hf_your_token_here
+GEMINI_API_KEY=your_gemini_api_key_here
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
 ```
 
 ---
@@ -175,79 +286,167 @@ VISION_API_KEY=hf_your_token_here
 ## 📁 Project Structure
 
 ```
-real-time-scene-narrator/
-├── .env.example               # Environment variable template
-├── README.md                  # This file
+Real-Time-Scene-Narrator/
+├── .env.example                    # Environment variable template
+├── README.md                       # This file
+├── package.json                    # Root workspace dependencies
 │
 ├── backend/
-│   ├── package.json           # Backend dependencies
+│   ├── .env                        # Your local environment variables (git-ignored)
+│   ├── package.json                # Backend dependencies & scripts
+│   ├── config/
+│   │   └── narration.json          # Object detection thresholds & priorities
+│   ├── models/
+│   │   └── yolo11n.onnx            # YOLOv11 Nano model for object detection
 │   └── src/
-│       ├── server.js          # Express server, middleware, routes
-│       └── routes/
-│           ├── describeScene.js    # POST /api/describe-scene (Hugging Face BLIP)
-│           ├── extractAddress.js   # POST /api/extract-address (BLIP + TrOCR)
-│           └── directions.js       # GET /api/directions (Nominatim + OSRM)
+│       ├── server.js               # Express server — middleware, routes, error handling
+│       ├── routes/
+│       │   ├── describeScene.js    # POST /api/describe-scene  (Gemini Vision)
+│       │   ├── extractAddress.js   # POST /api/extract-address (Gemini Vision + OCR)
+│       │   ├── tts.js             # POST /api/tts             (ElevenLabs TTS)
+│       │   └── directions.js      # GET  /api/directions      (Nominatim + OSRM)
+│       └── services/
+│           └── yoloDetector.js     # ONNX Runtime YOLOv11 inference service
 │
 └── frontend/
-    ├── package.json           # Frontend dependencies
-    ├── vite.config.ts         # Vite + API proxy config
-    ├── tailwind.config.js     # Tailwind dark mode + custom colors
-    ├── postcss.config.js      # PostCSS with Tailwind + Autoprefixer
-    ├── tsconfig.json          # TypeScript config
-    ├── index.html             # HTML entry point
+    ├── package.json                # Frontend dependencies & scripts
+    ├── vite.config.ts              # Vite dev server + API proxy configuration
+    ├── tailwind.config.js          # Tailwind CSS dark mode + custom theme
+    ├── postcss.config.js           # PostCSS with Tailwind + Autoprefixer
+    ├── tsconfig.json               # TypeScript configuration
+    ├── index.html                  # HTML entry point
     └── src/
-        ├── main.tsx           # React entry point
-        ├── App.tsx            # Router + dark mode context
-        ├── index.css          # Global styles + Tailwind
+        ├── main.tsx                # React entry point
+        ├── App.tsx                 # Router setup + dark mode context provider
+        ├── index.css               # Global styles + Tailwind imports
         ├── pages/
-        │   ├── LandingPage.tsx   # Marketing landing page
-        │   └── AppPage.tsx       # Main application with camera + modules
-        └── modules/
-            ├── CameraToVoice.tsx  # Module 1: frame capture + AI narration
-            ├── AmbientMode.tsx    # Module 2: COCO-SSD object detection
-            ├── TaskMode.tsx       # Module 3: text/address extraction
-            └── GPSNavigation.tsx  # Module 4: turn-by-turn GPS navigation
+        │   ├── LandingPage.tsx     # Marketing landing page with feature demos
+        │   └── AppPage.tsx         # Main application — camera + all modules
+        ├── modules/
+        │   ├── CameraToVoice.tsx   # Module 1: frame capture + Gemini AI narration
+        │   ├── AmbientMode.tsx     # Module 2: COCO-SSD real-time object detection
+        │   ├── TaskMode.tsx        # Module 3: text/address extraction from images
+        │   └── GPSNavigation.tsx   # Module 4: turn-by-turn GPS voice navigation
+        ├── components/
+        │   ├── DetectionOverlay.tsx # Bounding box overlay for object detection
+        │   └── InteractiveRouteMap.tsx # Leaflet map for GPS route display
+        └── utils/
+            ├── tts.ts              # ElevenLabs TTS client utility
+            └── detectionTracker.ts # Object proximity & tracking logic
 ```
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description | Rate Limit |
+|--------|----------|-------------|------------|
+| `GET` | `/health` | Server health check | — |
+| `POST` | `/api/describe-scene` | Describe a camera frame using Gemini Vision | 30/min |
+| `POST` | `/api/extract-address` | Extract text & addresses from an image | 30/min |
+| `POST` | `/api/tts` | Convert text to speech via ElevenLabs | 40/min |
+| `GET` | `/api/directions?from=lat,lng&to=address` | Get turn-by-turn directions | 30/min |
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+<details>
+<summary><strong>❌ <code>npm install</code> fails with permission errors</strong></summary>
+
+Try clearing the npm cache and reinstalling:
+```bash
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install
+```
+</details>
+
+<details>
+<summary><strong>❌ <code>nodemon: Permission denied</code> when running <code>npm run dev</code></strong></summary>
+
+Fix the executable permissions on the bin scripts:
+```bash
+chmod +x node_modules/.bin/*
+```
+Or use `npm start` instead (runs without nodemon).
+</details>
+
+<details>
+<summary><strong>❌ Backend starts but API calls return errors</strong></summary>
+
+1. Verify your `.env` file is in the `backend/` directory (not the project root)
+2. Check that your `GEMINI_API_KEY` starts with `AIza...`
+3. Check that your `ELEVENLABS_API_KEY` starts with `sk_...`
+4. Test the health endpoint: `curl http://localhost:5000/health`
+</details>
+
+<details>
+<summary><strong>❌ Camera doesn't work in the browser</strong></summary>
+
+- Make sure you're accessing the app via `http://localhost:5173` (not an IP address)
+- Camera access requires either `localhost` or `HTTPS`
+- Check that no other app is using the camera
+- Try a different browser (Chrome recommended)
+</details>
+
+<details>
+<summary><strong>❌ "Model loading" or 503 errors from Gemini</strong></summary>
+
+- Verify your API key is valid at [Google AI Studio](https://aistudio.google.com/apikey)
+- Check your free tier quota hasn't been exceeded
+- Wait a few seconds and retry — the first request may take longer
+</details>
+
+<details>
+<summary><strong>❌ No audio output / TTS not working</strong></summary>
+
+- Make sure your `ELEVENLABS_API_KEY` is set correctly in `backend/.env`
+- Check your ElevenLabs free tier character quota at [elevenlabs.io](https://elevenlabs.io)
+- Ensure the `ELEVENLABS_VOICE_ID` is valid (default `21m00Tcm4TlvDq8ikWAM` is the "Rachel" voice)
+</details>
+
+<details>
+<summary><strong>❌ Port already in use</strong></summary>
+
+Kill the process occupying the port:
+```bash
+# Find the process using port 5000
+lsof -i :5000
+# Kill it
+kill -9 <PID>
+```
+Or change the `PORT` in `backend/.env`.
+</details>
 
 ---
 
 ## ⚠️ Known Limitations
 
-### Hugging Face Free Tier
-- **Cold start**: Models sleep after inactivity. First request may take 20–30 seconds with a "503 Model Loading" response. Retry after the wait.
-- **Rate limits**: Free tier allows ~30,000 requests/month. Our 10 req/min backend limiter stays well within this.
-- **Model accuracy**: BLIP-large is excellent for scene description but limited for reading small text. For better OCR, consider upgrading to a paid Vision API.
-
-### TrOCR (Text Extraction)
-- Works best on **printed, clearly legible text**. Handwriting accuracy varies.
-- May not detect text in low-light or blurry images.
-
-### GPS Navigation
-- **Indoor accuracy**: GPS is less accurate indoors. Works best outdoors.
-- **OSRM demo server**: The public OSRM server is for testing. For production, consider self-hosting OSRM or using another free routing API.
-- Navigation proximity trigger is 100m — may need adjustment for dense urban areas.
-
-### Object Detection (COCO-SSD)
-- Detects 80 object classes from the COCO dataset.
-- "Approaching" detection uses bounding box area growth as a proxy for 3D approach.
-- May generate false positives in cluttered scenes.
-
-### Browser Compatibility
-- Web Speech API: Chrome/Edge have the best voices. Firefox and Safari have limited voice options.
-- TensorFlow.js: May be slow on older mobile CPUs. Reduce detection interval if needed.
-- Camera access: Requires HTTPS in production (or localhost for development).
+| Area | Limitation |
+|------|-----------|
+| **Gemini Vision** | Free tier has per-minute and daily request limits. Heavy usage may hit quotas. |
+| **ElevenLabs TTS** | Free tier is limited to 10,000 characters/month. Consider upgrading for heavy use. |
+| **Text Extraction** | Works best on printed, clearly legible text. Handwriting and low-light results vary. |
+| **GPS Navigation** | GPS accuracy drops indoors. Best used outdoors. Proximity trigger is 100m. |
+| **OSRM Routing** | Uses the public demo server. For production, self-host OSRM or use an alternative. |
+| **COCO-SSD** | Detects 80 COCO object classes. May produce false positives in cluttered scenes. |
+| **Browser TTS Fallback** | Web Speech API quality varies by browser; Chrome/Edge have the best voices. |
+| **TensorFlow.js** | May be slow on older mobile CPUs. Consider reducing the detection interval. |
 
 ---
 
 ## 🔮 Future Improvements
 
-- [ ] Add support for Google Cloud Vision API (higher OCR accuracy)
+- [ ] Offline mode using on-device vision models (MobileNet, etc.)
 - [ ] Self-hosted OSRM instance for production routing
-- [ ] Offline mode using on-device vision models (e.g., MobileNet variants)
 - [ ] Custom voice selection in settings
 - [ ] Multi-language narration support
 - [ ] Haptic feedback integration for mobile users
-- [ ] Progressive Web App (PWA) for offline use
+- [ ] Progressive Web App (PWA) for installable offline use
+- [ ] WebSocket-based real-time streaming for lower latency
 
 ---
 
@@ -259,9 +458,11 @@ MIT License — free to use, modify, and distribute.
 
 ## 🙏 Credits
 
-- [Hugging Face](https://huggingface.co) — Free AI model hosting (BLIP, TrOCR)
+- [Google Gemini](https://ai.google.dev/) — Vision API for scene understanding & OCR
+- [ElevenLabs](https://elevenlabs.io/) — Ultra-realistic AI text-to-speech
 - [OpenStreetMap](https://openstreetmap.org) — Free map data via Nominatim
 - [OSRM](https://project-osrm.org) — Open Source Routing Machine
 - [TensorFlow.js](https://tensorflow.org/js) — In-browser ML (COCO-SSD)
 - [Framer Motion](https://framer.com/motion) — React animations
 - [Tailwind CSS](https://tailwindcss.com) — Utility-first CSS framework
+- [Leaflet](https://leafletjs.com) — Interactive map library
