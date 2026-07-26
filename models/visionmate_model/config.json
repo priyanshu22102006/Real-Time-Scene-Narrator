@@ -1,0 +1,29 @@
+{
+  "model_name": "VisionMate Edge Perception Model",
+  "architecture": "YOLOv8 Nano",
+  "input_resolution": [
+    640,
+    640
+  ],
+  "confidence_threshold": 0.25,
+  "iou_threshold": 0.45,
+  "emergency_settings": {
+    "idle_sitting_alert_threshold_seconds": 10.0,
+    "distress_mood_trigger": true,
+    "medical_emergency_action": "TRIGGER_ALARM_AND_NOTIFY_CARE_NETWORK"
+  },
+  "supported_classes": [
+    "person",
+    "chair",
+    "table",
+    "vehicle",
+    "door",
+    "stairs",
+    "traffic_sign",
+    "obstacle",
+    "mood_happy",
+    "mood_neutral",
+    "mood_distressed",
+    "sitting_idle"
+  ]
+}
