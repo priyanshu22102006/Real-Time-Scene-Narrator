@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "onnxruntime-node": "^1.27.0",
+    "opencv.js": "^1.2.1",
+    "socket.io": "^4.8.3"
+  }
+}

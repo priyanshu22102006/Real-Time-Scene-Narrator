@@ -1,117 +1,267 @@
-# VisionMate
+# 👁 Real-Time Scene Narrator
 
-A voice-guided web app for visually impaired users, covering four features:
+An AI-powered accessibility tool that converts a live camera feed into spoken narration for visually impaired users. Combines AI vision, real-time object detection, text extraction, and GPS navigation — all powered by free, open-source APIs.
 
-1. **Live directions** — `/api/navigate`: turn-by-turn walking directions, narrated aloud.
-2. **Moving-object hazard alerts** — `/api/detect_objects`: detects nearby vehicles (car, bus, truck, motorcycle, bicycle, train) from live camera frames and speaks warnings like *"Warning: a bus is ahead and very close. Stop and wait."*
-3. **Address/sign reading + GPS** — `/api/read_address`: reads a photo of a sign/storefront, extracts an address, and geocodes it to GPS coordinates.
-4. **Full scene description** — `/api/describe_scene`: given a JPEG, describes the whole scene in plain spoken language.
+---
 
-## Architecture
+## ✨ Features
 
-```
-visionmate/
-├── app.py                  # Flask app — all 4 API endpoints + web UI route
-├── config.py                # API keys & tunable thresholds (reads env vars)
-├── modules/
-│   ├── scene_ai.py          # Gemini: scene description + address/text extraction
-│   ├── tts_engine.py         # ElevenLabs: text -> speech (MP3)
-│   ├── object_detector.py    # YOLOv8: vehicle detection + tracking + alerts
-│   └── navigator.py          # geopy geocoding + OpenRouteService walking routes
-├── templates/index.html      # Accessible front-end (large buttons, aria-live, camera)
-├── static/style.css           # High-contrast styling
-└── requirements.txt
-```
+- **Camera-to-Voice** — Captures camera frames every 2 seconds and speaks AI-generated scene descriptions
+- **Ambient Mode** — In-browser TensorFlow.js COCO-SSD detects approaching obstacles (cars, people, cyclists) and alerts instantly
+- **Task Mode** — Point at signs or documents; AI extracts text and addresses, reads them aloud, and can auto-launch GPS navigation
+- **GPS Navigation** — Turn-by-turn voice guidance using OpenStreetMap routing; speaks instructions as you approach each waypoint
 
-**Why this split:** each AI capability lives in its own module so you can
-swap providers later (e.g. a different TTS voice, a different vision model,
-a different routing API) without touching the Flask routes.
+---
 
-## Setup
+## 🛠 Tech Stack
+
+| Layer | Technology | License |
+|-------|-----------|---------|
+| Frontend | React 18 + TypeScript + Vite | MIT |
+| Styling | Tailwind CSS v3 | MIT |
+| Animations | Framer Motion | MIT |
+| Object Detection | TensorFlow.js COCO-SSD (in-browser) | Apache 2.0 |
+| Text-to-Speech | Web Speech API (browser built-in) | Browser native |
+| Camera Access | MediaDevices getUserMedia API | Browser native |
+| Backend | Node.js + Express | MIT |
+| **Vision API** | **Hugging Face Inference API (BLIP + TrOCR)** | **Free tier** |
+| **Geocoding** | **OpenStreetMap Nominatim** | **Free, no key** |
+| **Routing** | **OSRM (Open Source Routing Machine)** | **Free, no key** |
+
+---
+
+## 📋 Prerequisites
+
+- **Node.js** v18 or higher ([Download](https://nodejs.org))
+- **npm** v9+ (included with Node.js)
+- A modern browser with camera access (Chrome, Firefox, Edge, Safari)
+- A **free** Hugging Face account (for the Vision API key)
+
+---
+
+## 🔑 API Keys
+
+### Hugging Face (Vision API) — Free Tier
+
+1. Go to [https://huggingface.co/join](https://huggingface.co/join) and create a free account
+2. Navigate to [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+3. Click **"New token"** → Name it `scene-narrator` → Role: `Read` → Create
+4. Copy the token (starts with `hf_...`)
+5. Paste it as `VISION_API_KEY` in your `.env` file
+
+**Free tier limits:**
+- ~30,000 API calls/month on the free tier
+- Models may have a "cold start" delay of 20–30 seconds after inactivity (you'll see a "model loading" message)
+- Rate limit enforced in our backend: 10 vision requests/minute per IP
+
+### Directions API — No Key Required
+
+We use **OpenStreetMap Nominatim** and **OSRM** — both are completely free with no account needed:
+- Nominatim: max 1 request/second per IP (our rate limiter ensures this)
+- OSRM: public demo server, no key, generous limits for non-commercial use
+
+---
+
+## 🚀 Installation
+
+### 1. Clone the repository
 
 ```bash
-cd visionmate
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+git clone <your-repo-url>
+cd real-time-scene-narrator
 ```
 
-Set your API keys as environment variables (recommended over editing
-`config.py` directly):
+### 2. Set up the backend
 
 ```bash
-export GEMINI_API_KEY="your-gemini-key"
-export ELEVENLABS_API_KEY="your-elevenlabs-key"
-export ELEVENLABS_VOICE_ID="your-preferred-voice-id"   # optional
-export ORS_API_KEY="your-openrouteservice-key"          # only needed for /api/navigate
+cd backend
+npm install
+cp ../.env.example .env
+# Edit .env and add your VISION_API_KEY
 ```
 
-`ORS_API_KEY` is a **free** key from [openrouteservice.org](https://openrouteservice.org/dev/#/signup) — Gemini and ElevenLabs don't do routing/directions, so this project uses OpenRouteService for turn-by-turn walking directions and OpenStreetMap Nominatim (via `geopy`, no key needed) for geocoding addresses.
-
-Run it:
+### 3. Set up the frontend
 
 ```bash
-python app.py
+cd ../frontend
+npm install
 ```
 
-Open `http://localhost:5000` in a browser. On first run, `yolov8n.pt`
-(~6 MB) downloads automatically for object detection.
+---
 
-### Testing on a phone
+## ⚙️ Configuration
 
-Browsers only allow camera/microphone access over **HTTPS** or on
-`localhost`. To test on a real phone on your network, either:
-- use a tunnel like `ngrok http 5000`, or
-- set up a local HTTPS cert (e.g. with `mkcert`) and run Flask with `ssl_context`.
+Edit `backend/.env`:
 
-## How "live" works here
+```env
+VISION_API_KEY=hf_your_token_here
+PORT=5000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+```
 
-True continuous video streaming to a cloud vision model is expensive and
-often too slow for split-second hazard alerts. This project instead uses a
-**hybrid approach**:
+---
 
-- **Hazard detection (feature 2)** runs locally and fast: YOLOv8 processes
-  each captured frame directly in the Python backend (no external API call
-  per frame), so it can run several times a second. The front-end captures a
-  frame from the live camera every ~500ms and posts it to
-  `/api/detect_objects`.
-- **Scene description & sign reading (features 3 & 4)** call Gemini, which
-  is much richer but slower/costlier — these are triggered on demand (button
-  press) rather than continuously.
-- **Navigation (feature 1)** computes the full route once, then narrates it;
-  you can extend this to re-check the user's GPS position periodically and
-  announce only the next turn (see "Next steps" below).
+## ▶️ Running the App
 
-## Tuning hazard sensitivity
+Open **two terminal windows**:
 
-In `config.py`:
-- `DANGER_DISTANCE_RATIO` — how large (as a fraction of frame height) a
-  vehicle's bounding box must be before it's considered "close."
-- `APPROACH_SPEED_THRESHOLD` — how fast that box must be growing
-  frame-to-frame before it's flagged as "approaching quickly."
+**Terminal 1 — Backend:**
+```bash
+cd backend
+npm run dev
+```
+The backend will start on `http://localhost:5000`
 
-Lower these to get more (and earlier) alerts; raise them to reduce false
-alarms. These are heuristics based on bounding-box size, not true physical
-distance — for higher accuracy you'd add a depth sensor, stereo camera, or a
-monocular depth-estimation model.
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+The frontend will start on `http://localhost:5173`
 
-## Next steps / production considerations
+Open `http://localhost:5173` in your browser.
 
-- **Continuous turn-by-turn navigation:** poll `navigator.geolocation` on
-  the client every few seconds, compare the user's position to the route's
-  step coordinates, and only speak the next instruction when they're close
-  to a turn (instead of reading the whole route at once).
-- **Offline/edge object detection:** for a real mobile app, consider running
-  YOLOv8 on-device (e.g. exported to CoreML/TFLite) to remove network
-  latency from hazard alerts entirely — this matters a lot for a safety
-  feature.
-- **Rate limiting & cost control:** Gemini and ElevenLabs calls cost money
-  per request; add caching/debouncing so a user mashing "Describe the scene"
-  doesn't rack up unnecessary calls.
-- **Error handling & connectivity loss:** add local fallback messages (e.g.
-  cached "no internet" audio) since a visually impaired user especially
-  needs to know when a feature has silently failed.
-- **Privacy:** camera frames and photos are sent to Google (Gemini) and
-  location data to OpenRouteService/Nominatim — disclose this clearly to
-  users and avoid storing images/audio longer than necessary (this demo
-  keeps generated audio in a temp directory only).
+---
+
+## 🌐 How to Use
+
+### Landing Page (`/`)
+The marketing page explains all features with animated cards and demonstrations.
+Click **"Try Live Demo"** to open the app.
+
+### App (`/app`)
+
+1. **Start Camera** — Click "Start Camera" and allow browser camera permission
+2. **Select a Mode** using the tab buttons:
+   - **Camera-to-Voice**: Click "Start Narration" to begin 2-second interval narration
+   - **Ambient Mode**: Click "Start Monitoring" to load COCO-SSD and begin threat detection
+   - **Task Mode**: Capture or upload a photo to extract text and addresses
+   - **GPS Navigation**: Enter a destination address (or let Task Mode fill it automatically)
+3. All speech output uses the **Web Speech API** — works offline once the page is loaded
+
+### Keyboard Shortcuts
+- `?` — Toggle help panel
+- `Esc` — Close help panel
+- `Tab` — Navigate between all interactive elements
+- `Enter` — Activate focused button
+
+---
+
+## 🏗 Build for Production
+
+```bash
+# Build frontend
+cd frontend
+npm run build
+
+# The built files are in frontend/dist/
+# Serve them with any static file server or CDN
+
+# Start backend in production
+cd ../backend
+NODE_ENV=production npm start
+```
+
+### Environment variables for production:
+```env
+NODE_ENV=production
+FRONTEND_URL=https://your-deployed-frontend.com
+VISION_API_KEY=hf_your_token_here
+```
+
+---
+
+## 📁 Project Structure
+
+```
+real-time-scene-narrator/
+├── .env.example               # Environment variable template
+├── README.md                  # This file
+│
+├── backend/
+│   ├── package.json           # Backend dependencies
+│   └── src/
+│       ├── server.js          # Express server, middleware, routes
+│       └── routes/
+│           ├── describeScene.js    # POST /api/describe-scene (Hugging Face BLIP)
+│           ├── extractAddress.js   # POST /api/extract-address (BLIP + TrOCR)
+│           └── directions.js       # GET /api/directions (Nominatim + OSRM)
+│
+└── frontend/
+    ├── package.json           # Frontend dependencies
+    ├── vite.config.ts         # Vite + API proxy config
+    ├── tailwind.config.js     # Tailwind dark mode + custom colors
+    ├── postcss.config.js      # PostCSS with Tailwind + Autoprefixer
+    ├── tsconfig.json          # TypeScript config
+    ├── index.html             # HTML entry point
+    └── src/
+        ├── main.tsx           # React entry point
+        ├── App.tsx            # Router + dark mode context
+        ├── index.css          # Global styles + Tailwind
+        ├── pages/
+        │   ├── LandingPage.tsx   # Marketing landing page
+        │   └── AppPage.tsx       # Main application with camera + modules
+        └── modules/
+            ├── CameraToVoice.tsx  # Module 1: frame capture + AI narration
+            ├── AmbientMode.tsx    # Module 2: COCO-SSD object detection
+            ├── TaskMode.tsx       # Module 3: text/address extraction
+            └── GPSNavigation.tsx  # Module 4: turn-by-turn GPS navigation
+```
+
+---
+
+## ⚠️ Known Limitations
+
+### Hugging Face Free Tier
+- **Cold start**: Models sleep after inactivity. First request may take 20–30 seconds with a "503 Model Loading" response. Retry after the wait.
+- **Rate limits**: Free tier allows ~30,000 requests/month. Our 10 req/min backend limiter stays well within this.
+- **Model accuracy**: BLIP-large is excellent for scene description but limited for reading small text. For better OCR, consider upgrading to a paid Vision API.
+
+### TrOCR (Text Extraction)
+- Works best on **printed, clearly legible text**. Handwriting accuracy varies.
+- May not detect text in low-light or blurry images.
+
+### GPS Navigation
+- **Indoor accuracy**: GPS is less accurate indoors. Works best outdoors.
+- **OSRM demo server**: The public OSRM server is for testing. For production, consider self-hosting OSRM or using another free routing API.
+- Navigation proximity trigger is 100m — may need adjustment for dense urban areas.
+
+### Object Detection (COCO-SSD)
+- Detects 80 object classes from the COCO dataset.
+- "Approaching" detection uses bounding box area growth as a proxy for 3D approach.
+- May generate false positives in cluttered scenes.
+
+### Browser Compatibility
+- Web Speech API: Chrome/Edge have the best voices. Firefox and Safari have limited voice options.
+- TensorFlow.js: May be slow on older mobile CPUs. Reduce detection interval if needed.
+- Camera access: Requires HTTPS in production (or localhost for development).
+
+---
+
+## 🔮 Future Improvements
+
+- [ ] Add support for Google Cloud Vision API (higher OCR accuracy)
+- [ ] Self-hosted OSRM instance for production routing
+- [ ] Offline mode using on-device vision models (e.g., MobileNet variants)
+- [ ] Custom voice selection in settings
+- [ ] Multi-language narration support
+- [ ] Haptic feedback integration for mobile users
+- [ ] Progressive Web App (PWA) for offline use
+
+---
+
+## 📄 License
+
+MIT License — free to use, modify, and distribute.
+
+---
+
+## 🙏 Credits
+
+- [Hugging Face](https://huggingface.co) — Free AI model hosting (BLIP, TrOCR)
+- [OpenStreetMap](https://openstreetmap.org) — Free map data via Nominatim
+- [OSRM](https://project-osrm.org) — Open Source Routing Machine
+- [TensorFlow.js](https://tensorflow.org/js) — In-browser ML (COCO-SSD)
+- [Framer Motion](https://framer.com/motion) — React animations
+- [Tailwind CSS](https://tailwindcss.com) — Utility-first CSS framework
