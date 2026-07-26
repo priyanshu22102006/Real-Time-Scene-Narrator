@@ -1,4 +1,7 @@
 // IoU-based multi-object tracker with EMA bbox smoothing and temporal persistence.
+// Enriched with monocular distance estimation per tracked object.
+
+import { estimateDistanceFromNormBbox, type DistanceEstimate } from './distanceEstimator';
 
 export interface RawDetection {
   class: string;
@@ -10,6 +13,14 @@ export interface TrackedDetection extends RawDetection {
   id: number;
   /** Normalized bbox [x, y, w, h] relative to frame dimensions (0–1) */
   normBbox: [number, number, number, number];
+  /** Estimated distance in meters (null if unavailable) */
+  distanceMeters: number | null;
+  /** Speech-friendly distance label (e.g., "about 3 meters away") */
+  distanceLabel: string;
+  /** Short UI label (e.g., "3.2m") */
+  distanceShortLabel: string;
+  /** Distance zone key (e.g., "close", "very_close") */
+  distanceZone: string;
 }
 
 interface InternalTrack {
@@ -205,13 +216,21 @@ export function updateDetectionTracks(
   });
 
   return Array.from(tracks.values())
-    .map(t => ({
-      id: t.id,
-      class: t.class,
-      score: t.score,
-      bbox: t.bbox,
-      normBbox: toNormBbox(t.bbox, frameW, frameH),
-    }));
+    .map(t => {
+      const normBbox = toNormBbox(t.bbox, frameW, frameH);
+      const distEst = estimateDistanceFromNormBbox(t.class, normBbox[3], frameH, frameW, normBbox[2], normBbox[1]);
+      return {
+        id: t.id,
+        class: t.class,
+        score: t.score,
+        bbox: t.bbox,
+        normBbox,
+        distanceMeters: distEst.meters,
+        distanceLabel: distEst.label,
+        distanceShortLabel: distEst.shortLabel,
+        distanceZone: distEst.zone,
+      };
+    });
 }
 
 /** Returns true when a track has been consistently approaching for enough frames. */

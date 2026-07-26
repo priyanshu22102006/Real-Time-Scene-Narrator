@@ -5,6 +5,12 @@ import fs from 'fs';
 import path from 'path';
 import ort from 'onnxruntime-node';
 import jpeg from 'jpeg-js';
+import {
+  estimateDistance,
+  loadDistanceConfig,
+  formatDistanceForSpeech,
+  formatDistanceShort,
+} from './distanceCalculator.js';
 
 // Load narration configuration JSON
 const configPath = path.resolve(process.cwd(), 'config/narration.json');
@@ -15,10 +21,12 @@ const {
   cooldownMs,
   maxDetectionsPerFrame = 10,
   objectPriorities,
-  distanceRanges,
   positionRanges,
   cocoClasses,
 } = narrationConfig;
+
+// Initialize distance calculation engine from config
+loadDistanceConfig();
 
 // Absolute path to yolo11n.onnx model
 const MODEL_PATH = path.resolve(process.cwd(), 'models/yolo11n.onnx');
@@ -128,19 +136,28 @@ function getPosition(cxNorm) {
 }
 
 /**
- * Calculates Distance (Very Close, Close, Medium, Far) based on bounding box area ratio
+ * Calculates metric distance using the monocular distance estimation engine (v2).
+ * Now passes bbox width and Y position for multi-cue accuracy.
+ *
+ * @param {string} className       - COCO class name
+ * @param {number} bboxHeightNorm  - Normalized bounding box height (0–1)
+ * @param {number} bboxWidthNorm   - Normalized bounding box width (0–1)
+ * @param {number} bboxYNorm       - Normalized bounding box top-Y (0–1)
+ * @param {number} origH           - Original image height in pixels
+ * @param {number} origW           - Original image width in pixels
  */
-function getDistance(areaNorm) {
-  if (areaNorm >= distanceRanges.very_close.minArea) {
-    return { distKey: 'very_close', label: distanceRanges.very_close.label };
-  }
-  if (areaNorm >= distanceRanges.close.minArea) {
-    return { distKey: 'close', label: distanceRanges.close.label };
-  }
-  if (areaNorm >= distanceRanges.medium.minArea) {
-    return { distKey: 'medium', label: distanceRanges.medium.label };
-  }
-  return { distKey: 'far', label: distanceRanges.far.label };
+function getDistance(className, bboxHeightNorm, bboxWidthNorm, bboxYNorm, origH, origW) {
+  const bboxHeightPx = bboxHeightNorm * origH;
+  const bboxWidthPx = bboxWidthNorm * origW;
+  const bboxYPx = bboxYNorm * origH;
+  const result = estimateDistance(className, bboxHeightPx, origH, origW, bboxWidthPx, bboxYPx);
+  return {
+    distKey: result.zone,
+    label: result.label,
+    meters: result.meters,
+    urgency: result.urgency,
+    confidence: result.confidence,
+  };
 }
 
 /**
@@ -313,7 +330,7 @@ function postprocessYolo(outputTensor, origW, origH, scale, padX, padY) {
       const area = w * h;
 
       const position = getPosition(cx);
-      const distance = getDistance(area);
+      const distance = getDistance(className, h, w, bbox[1], origH, origW);
 
       rawDetections.push({
         class: className,
@@ -357,6 +374,7 @@ function postprocessYolo(outputTensor, origW, origH, scale, padX, padY) {
 
 /**
  * Priority Narration Engine: Formulates intelligent speech narration
+ * Now includes metric distance estimates in spoken output.
  */
 function generateNarrationText(detections) {
   if (!detections || detections.length === 0) {
@@ -377,18 +395,24 @@ function generateNarrationText(detections) {
   lastAnnouncedKey = currentKey;
 
   const article = ['a', 'e', 'i', 'o', 'u'].includes(primary.class[0].toLowerCase()) ? 'An' : 'A';
-  const className = primary.class.charAt(0).toUpperCase() + primary.class.slice(1);
+  const distLabel = primary.distance.label || 'nearby';
 
   if (detections.length === 1) {
-    return `There is ${article.toLowerCase()} ${primary.class} ${primary.position.label}, ${primary.distance.label}.`;
+    return `There is ${article.toLowerCase()} ${primary.class} ${primary.position.label}, ${distLabel}.`;
   }
 
   const uniqueClasses = Array.from(new Set(detections.map(d => d.class)));
   if (uniqueClasses.length === 1) {
-    return `Detected ${detections.length} ${primary.class}s ${primary.position.label}.`;
+    const groupDist = primary.distance.meters
+      ? `, ${formatDistanceForSpeech(primary.distance.meters)}`
+      : '';
+    return `Detected ${detections.length} ${primary.class}s ${primary.position.label}${groupDist}.`;
   }
 
-  const topItems = detections.slice(0, 3).map(d => `${d.class} ${d.position.label}`).join(' and ');
+  const topItems = detections.slice(0, 3).map(d => {
+    const dLabel = d.distance.meters ? `, ${formatDistanceForSpeech(d.distance.meters)}` : '';
+    return `${d.class} ${d.position.label}${dLabel}`;
+  }).join(' and ');
   return `Detected ${topItems}.`;
 }
 
@@ -422,6 +446,9 @@ export async function detectObjectsFromFrame(imageBuffer) {
       confidence: Math.round(d.score * 100),
       position: d.position.label,
       distance: d.distance.label,
+      distanceMeters: d.distance.meters || null,
+      distanceZone: d.distance.distKey || 'far',
+      distanceUrgency: d.distance.urgency || 'info',
       priority: d.priority,
       bbox: d.bbox,
     })),

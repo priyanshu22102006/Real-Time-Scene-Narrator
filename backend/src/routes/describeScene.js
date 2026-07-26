@@ -6,7 +6,7 @@
 import fetch from 'node-fetch';
 import { detectObjectsFromFrame } from '../services/yoloDetector.js';
 
-const GEMINI_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'];
 
 async function describeWithGemini(imageBuffer) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -87,6 +87,9 @@ Return ONLY a valid JSON object matching this structure:
       } else {
         const errText = await response.text();
         console.warn(`[describe-scene] Gemini ${model} HTTP ${response.status}:`, errText);
+        if (response.status === 403 && errText.includes('leaked')) {
+          console.error('[describe-scene] ❌ GEMINI_API_KEY in backend/.env is reported as leaked by Google. Please generate a new key at https://aistudio.google.com/apikey');
+        }
       }
     } catch (err) {
       console.warn(`[describe-scene] Gemini ${model} error:`, err.message);

@@ -2,6 +2,10 @@
   "confidenceThreshold": 0.25,
   "cooldownMs": 3000,
   "maxDetectionsPerFrame": 10,
+  "camera": {
+    "defaultHFovDegrees": 72,
+    "focalLengthOverride": null
+  },
   "priorityLevels": {
     "danger": 1,
     "vehicle": 2,
@@ -47,6 +51,13 @@
     "keyboard": 5,
     "remote": 5,
     "clock": 5
+  },
+  "distanceZones": {
+    "immediate":  { "maxMeters": 1.0,  "label": "right next to you",      "urgency": "critical" },
+    "very_close": { "maxMeters": 2.0,  "label": "very close",             "urgency": "high" },
+    "close":      { "maxMeters": 4.0,  "label": "close",                  "urgency": "medium" },
+    "medium":     { "maxMeters": 8.0,  "label": "at a moderate distance", "urgency": "low" },
+    "far":        { "maxMeters": 999,  "label": "far away",               "urgency": "info" }
   },
   "distanceRanges": {
     "very_close": { "minArea": 0.35, "label": "very close to you" },

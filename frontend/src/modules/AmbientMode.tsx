@@ -11,12 +11,15 @@ import {
   type TrackedDetection,
   type TrackMap,
 } from '../utils/detectionTracker';
+import { formatDistanceForSpeech } from '../utils/distanceEstimator';
 
 interface Detection {
   class: string;
   score: number;
   bbox: [number, number, number, number];
   id?: number;
+  distanceMeters?: number | null;
+  distanceShortLabel?: string;
 }
 
 interface AmbientModeProps {
@@ -45,11 +48,13 @@ function getApproachDirection(cx: number, isMirrored: boolean): string {
 }
 
 // Category-aware obstacle dictation — produces rich spoken descriptions per object type
+// Now includes metric distance estimates for precise spatial awareness.
 function buildObstacleDictation(
   className: string,
   direction: string,
   isApproaching: boolean,
-  isBlocking: boolean
+  isBlocking: boolean,
+  distanceMeters: number | null
 ): string {
   const name = className.toLowerCase();
   const vehicleSet = new Set(['car', 'truck', 'bus', 'motorcycle', 'bicycle']);
@@ -58,30 +63,32 @@ function buildObstacleDictation(
   const groundSet = new Set(['backpack', 'suitcase', 'bottle', 'cup', 'potted plant']);
   const signSet = new Set(['traffic light', 'stop sign']);
 
+  const dist = distanceMeters !== null ? `, ${formatDistanceForSpeech(distanceMeters)}` : '';
+
   if (vehicleSet.has(name)) {
     return isApproaching
-      ? `Caution! A ${name} is moving towards you ${direction}!`
-      : `Warning! A parked ${name} is in your path ${direction}.`;
+      ? `Caution! A ${name} is moving towards you ${direction}${dist}!`
+      : `Warning! A parked ${name} is in your path ${direction}${dist}.`;
   }
   if (pedestrianSet.has(name)) {
     return isApproaching
-      ? `Notice! A ${name} is walking ${direction}!`
-      : `A ${name} is detected ${direction}.`;
+      ? `Notice! A ${name} is walking ${direction}${dist}!`
+      : `A ${name} is detected ${direction}${dist}.`;
   }
   if (furnitureSet.has(name)) {
     return isBlocking
-      ? `Warning! A ${name} is blocking your walking path ${direction}!`
-      : `Caution! There is a ${name} obstacle ${direction}.`;
+      ? `Warning! A ${name} is blocking your walking path ${direction}${dist}!`
+      : `Caution! There is a ${name} obstacle ${direction}${dist}.`;
   }
   if (groundSet.has(name)) {
-    return `Watch your step! There is a ${name} on the ground ${direction}.`;
+    return `Watch your step! There is a ${name} on the ground ${direction}${dist}.`;
   }
   if (signSet.has(name)) {
-    return `Attention! A ${name} is detected ${direction}.`;
+    return `Attention! A ${name} is detected ${direction}${dist}.`;
   }
   return isBlocking
-    ? `Warning! A ${className} obstacle is blocking your path ${direction}!`
-    : `Notice! There is a ${className} ${direction}.`;
+    ? `Warning! A ${className} obstacle is blocking your path ${direction}${dist}!`
+    : `Notice! There is a ${className} ${direction}${dist}.`;
 }
 
 function speakAlert(text: string) {
@@ -175,6 +182,8 @@ export default function AmbientMode({
           class: t.class,
           score: t.score,
           bbox: t.bbox,
+          distanceMeters: t.distanceMeters,
+          distanceShortLabel: t.distanceShortLabel,
         })));
 
         onTrackedDetectionsRef.current?.(tracked);
@@ -196,7 +205,7 @@ export default function AmbientMode({
           const cx = track.normBbox[0] + track.normBbox[2] / 2;
           const direction = getApproachDirection(cx, mirrored);
           const className = track.class.charAt(0).toUpperCase() + track.class.slice(1);
-          const alertText = buildObstacleDictation(className, direction, isApproaching, isBlocking);
+          const alertText = buildObstacleDictation(className, direction, isApproaching, isBlocking, track.distanceMeters);
           const alertKey = `${track.class}_active`;
           const lastAlert = lastAlertTimeRef.current.get(alertKey) || 0;
 
@@ -216,8 +225,9 @@ export default function AmbientMode({
           const cx = track.normBbox[0] + track.normBbox[2] / 2;
           const direction = getApproachDirection(cx, mirrored);
           const className = track.class.charAt(0).toUpperCase() + track.class.slice(1);
-          // Gentle announcement for detected-but-not-blocking objects
-          const alertText = `Detected: ${className} ${direction}.`;
+          // Gentle announcement for detected-but-not-blocking objects with distance
+          const distStr = track.distanceMeters !== null ? ` (${track.distanceShortLabel})` : '';
+          const alertText = `Detected: ${className} ${direction}${distStr}.`;
           const alertKey = `${track.class}_detected`;
           const lastAlert = lastAlertTimeRef.current.get(alertKey) || 0;
 
@@ -320,7 +330,7 @@ export default function AmbientMode({
                     : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400'
                 }`}
               >
-                {det.class} ({Math.round(det.score * 100)}%)
+                {det.class} ({Math.round(det.score * 100)}%){det.distanceShortLabel ? ` · ${det.distanceShortLabel}` : ''}
               </span>
             ))}
           </div>

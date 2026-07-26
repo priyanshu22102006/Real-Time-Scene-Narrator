@@ -9,6 +9,7 @@ interface DetectionItem {
   confidence: number;
   position: string;
   distance: string;
+  distanceMeters?: number | null;
 }
 
 interface NarratorState {
@@ -281,7 +282,7 @@ export default function CameraToVoice({ videoRef, isCameraActive }: CameraToVoic
                 key={`${det.class}-${i}`}
                 className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-800/50 text-indigo-800 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-700"
               >
-                {det.class.charAt(0).toUpperCase() + det.class.slice(1)} ({det.confidence}%) · {det.position}
+                {det.class.charAt(0).toUpperCase() + det.class.slice(1)} ({det.confidence}%) · {det.position}{det.distanceMeters != null ? ` · ${det.distanceMeters}m` : ''}
               </span>
             ))}
           </div>
